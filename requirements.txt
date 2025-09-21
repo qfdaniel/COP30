@@ -2,6 +2,7 @@ streamlit
 pandas
 gspread
 google-auth-oauthlib
-plotly-express
+plotly
 pytz
 streamlit-aggrid
+openpyxl

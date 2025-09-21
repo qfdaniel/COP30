@@ -8,6 +8,7 @@ import pytz
 from st_aggrid import AgGrid, GridOptionsBuilder
 import json
 import io
+import streamlit.components.v1 as components
 
 # --- 0. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
@@ -16,6 +17,11 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# --- INÍCIO DA MODIFICAÇÃO: Adiciona auto-refresh na página a cada 5 minutos ---
+components.html("<meta http-equiv='refresh' content='300'>", height=0)
+# --- FIM DA MODIFICAÇÃO ---
+
 
 # --- 1. GERENCIAMENTO DE TEMA E ESTILOS (CSS) ---
 
@@ -104,21 +110,19 @@ def get_full_css(theme):
         [data-testid="stSidebar"] .sidebar-logo img {{ filter: drop-shadow(3px 3px 5px rgba(0,0,0,0.4)); }}
         header[data-testid="stHeader"] {{ background-color: transparent; }}
         h3 {{ font-size: 1.1em !important; }}
-        .style-marker {{ display: none; }}
+        .style-marker, .table-container-style {{ display: none; }}
         
-        /* ALTERAÇÃO 1: Reduz espaço entre o título e a linha divisória abaixo dele */
         section.main hr {{
             margin-top: -0.5rem !important;
             margin-bottom: 0.5rem !important;
         }}
 
-        /* ALTERAÇÃO 3: Reduz o espaço ABAIXO dos containers dos gráficos e da tabela */
         .style-marker + div[data-testid="stVerticalBlock"] {{
             margin-bottom: 0.1rem !important;
         }}
 
         [data-testid="stSidebar"] h1 {{ margin-top: -5px; }}
-        [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] [data-testid="stExpander"] summary, .sidebar-info-box {{ 
+        [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] .stMultiSelect, [data-testid="stSidebar"] [data-testid="stExpander"] summary, .sidebar-info-box {{ 
             border-radius: 8px; padding: 10px; 
         }}
         [data-testid="stSidebar"] .stButton>button {{ border-radius: 8px; font-weight: bold; transition: all 0.3s ease; }}
@@ -128,7 +132,7 @@ def get_full_css(theme):
             margin-top: 0.5rem !important;
             margin-bottom: 0.5rem !important;
         }}
-        [data-testid="stSidebar"] .stSelectbox + hr, [data-testid="stSidebar"] .stButton + hr {{
+        [data-testid="stSidebar"] .stSelectbox + hr, [data-testid="stSidebar"] .stMultiSelect + hr, [data-testid="stSidebar"] .stButton + hr {{
             margin-top: 0.5rem !important;
             margin-bottom: 0.5rem !important;
         }}
@@ -136,6 +140,36 @@ def get_full_css(theme):
             margin-top: -0.5rem !important;
         }}
         .ag-header-cell-label {{ justify-content: center; font-weight: bold; }}
+
+        /* CSS para botões de confirmação (Sim/Não) */
+        .confirm-yes-button .stButton > button {{
+            background-color: #4CAF50 !important;
+            color: white !important;
+            border: 1px solid #388E3C !important;
+        }}
+        .confirm-yes-button .stButton > button:hover {{
+            background-color: #66BB6A !important;
+            border-color: #4CAF50 !important;
+            color: white !important;
+        }}
+        .confirm-no-button .stButton > button {{
+            background-color: #DF1B1D !important;
+            color: white !important;
+            border: 1px solid #C62828 !important;
+        }}
+        .confirm-no-button .stButton > button:hover {{
+            background-color: #E57373 !important;
+            border-color: #DF1B1D !important;
+            color: white !important;
+        }}
+
+        /* Novo estilo para o container da tabela */
+        .table-container-style + div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] {{
+            border: 1px solid {border_color};
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }}
     """
     if theme == 'Dark':
         return common_css + f"""
@@ -151,11 +185,11 @@ def get_full_css(theme):
             .kpi-value {{ color: white !important; }}
             [data-testid="stSidebar"] {{ background-image: linear-gradient(to bottom, #2C2C2C, #1E1E1E); }}
             [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p {{ color: #E0E0E0; }}
-            [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] [data-testid="stExpander"] summary, .sidebar-info-box {{ 
+            [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] .stMultiSelect, [data-testid="stSidebar"] [data-testid="stExpander"] summary, .sidebar-info-box {{ 
                 background-color: #3C3C3C; border: 1px solid #555555; 
             }}
             .sidebar-info-box * {{ color: #BDBAB3 !important; }}
-            [data-testid="stSidebar"] .stSelectbox label, [data-testid="stSidebar"] [data-testid="stExpander"] summary p, [data-testid="stSidebar"] .stCheckbox p {{ color: #E0E0E0 !important; }}
+            [data-testid="stSidebar"] .stSelectbox label, [data-testid="stSidebar"] .stMultiSelect label, [data-testid="stSidebar"] [data-testid="stExpander"] summary p, [data-testid="stSidebar"] .stCheckbox p {{ color: #E0E0E0 !important; }}
             [data-testid="stSidebar"] [data-testid="stExpander"] summary svg {{ fill: #E0E0E0 !important; }}
             [data-testid="stSidebar"] .st-emotion-cache-s492w3 {{ border: 1px solid #555555; background-color: #2C2C2C; color: #E0E0E0; }}
             [data-testid="stSidebar"] small {{ color: #DF1B1D !important; font-weight: bold; }}
@@ -172,10 +206,10 @@ def get_full_css(theme):
             .kpi-value {{ color: #1A311F !important; }}
             [data-testid="stSidebar"] {{ background-image: linear-gradient(to bottom, #F5EFE6, #E8D5C4); }}
             [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p, [data-testid="stSidebar"] .stCheckbox p {{ color: #38322C; }}
-            [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] [data-testid="stExpander"] summary, .sidebar-info-box {{ 
+            [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] .stMultiSelect, [data-testid="stSidebar"] [data-testid="stExpander"] summary, .sidebar-info-box {{ 
                 background-color: #E8D5C4; border: 1px solid #C3A995; 
             }}
-            [data-testid="stSidebar"] .stSelectbox label, [data-testid="stSidebar"] [data-testid="stExpander"] summary p {{ color: #38322C !important; }}
+            [data-testid="stSidebar"] .stSelectbox label, [data-testid="stSidebar"] .stMultiSelect label, [data-testid="stSidebar"] [data-testid="stExpander"] summary p {{ color: #38322C !important; }}
             [data-testid="stSidebar"] [data-testid="stExpander"] summary svg {{ fill: #38322C; }}
             [data-testid="stSidebar"] .st-emotion-cache-s492w3 {{ border: 1px solid #C3A995; background-color: #F5EFE6; color: #38322C; }}
             [data-testid="stSidebar"] small {{ color: #DF1B1D !important; font-weight: bold; }}
@@ -197,15 +231,7 @@ def to_excel(df: pd.DataFrame):
 def carregar_dados():
     try:
         scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        
-        # --- ALTERAÇÃO PARA STREAMLIT CLOUD ---
-        # Acesso às credenciais do Google Sheets via st.secrets
-        # O conteúdo do seu google_credentials.json deve ser copiado
-        # e colado no painel do Streamlit Cloud como um 'secret'
-        # com o nome 'google_credentials'.
-        creds_json = json.loads(st.secrets["google_credentials"])
-        creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
-        
+        creds = Credentials.from_service_account_file("google_credentials.json", scopes=scopes)
         client = gspread.authorize(creds)
         planilha = client.open("MONITORAÇÃO - COP30")
         aba_painel = planilha.worksheet("PAINEL")
@@ -284,13 +310,37 @@ def clear_filters():
     st.session_state.reset_key += 1
     st.rerun()
 
+df = df_original.copy()
+if not df.empty:
+    datas_selecionadas_list = [data for data, checked in st.session_state.items() if data.startswith('date_') and checked]
+    any_date_options = any(key.startswith('date_') for key in st.session_state)
+    
+    if any_date_options and not datas_selecionadas_list:
+        df = pd.DataFrame(columns=df.columns)
+    elif datas_selecionadas_list:
+        datas_para_filtrar = [pd.to_datetime(data.replace('date_', ''), errors='coerce') for data in datas_selecionadas_list]
+        df = df.loc[df['Data'].isin(datas_para_filtrar)]
+
+    estacoes_filtradas = st.session_state.get('estacao_selecionada', [])
+    if estacoes_filtradas:
+        df = df[df['Estação'].isin(estacoes_filtradas)]
+    if st.session_state.get('faixa_selecionada', 'Todas') != 'Todas': df = df[df['Faixa de Frequência Envolvida'] == st.session_state['faixa_selecionada']]
+    if st.session_state.get('frequencia_selecionada', 'Todas') != 'Todas': df = df[df['Frequência (MHz)'] == st.session_state['frequencia_selecionada']]
+    if st.session_state.get('severidade_selecionada', 'Todas') != 'Todas': df = df[df['Severidade?'] == st.session_state['severidade_selecionada']]
+    if st.session_state.get('ocorrencia_selecionada', 'Todas') != 'Todas':
+        map_status = {'Pendentes': 'Pendente', 'Concluídas': 'Concluída'}
+        df = df[df['Situação'] == map_status[st.session_state['ocorrencia_selecionada']]]
+
 with st.sidebar:
     st.toggle('Modo Dark', key='theme_toggle', value=(st.session_state.theme == 'Dark'), on_change=toggle_theme)
     st.title("Filtros")
     if not df_original.empty:
         df_filtros = df_original.copy().dropna(subset=['Data'])
-        for key in ['faixa_selecionada', 'frequencia_selecionada', 'severidade_selecionada', 'estacao_selecionada', 'ocorrencia_selecionada']:
+        
+        for key in ['faixa_selecionada', 'frequencia_selecionada', 'severidade_selecionada', 'ocorrencia_selecionada']:
             if key not in st.session_state: st.session_state[key] = 'Todas'
+        if 'estacao_selecionada' not in st.session_state:
+            st.session_state['estacao_selecionada'] = []
         
         datas_disponiveis = sorted(df_filtros['Data'].dt.date.unique())
         if 'initial_data_selection' not in st.session_state:
@@ -323,8 +373,14 @@ with st.sidebar:
     else:
         st.warning("Tabela de dados está vazia.")
 
-    estacoes_lista = ['Todas'] + sorted([e for e in estacoes_info['Estação'].unique() if e != 'Miaer'])
-    st.session_state['estacao_selecionada'] = st.selectbox('Estação:', estacoes_lista, key=f'estacao_select_{st.session_state.reset_key}', index=estacoes_lista.index(st.session_state.get('estacao_selecionada', 'Todas')) if st.session_state.get('estacao_selecionada', 'Todas') in estacoes_lista else 0)
+    estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e != 'Miaer'])
+    st.session_state['estacao_selecionada'] = st.multiselect(
+        'Estação(ões):', 
+        estacoes_lista, 
+        default=st.session_state['estacao_selecionada'],
+        key=f'estacao_multiselect_{st.session_state.reset_key}',
+        placeholder='Todas'
+    )
     opcoes_ocorrencia = ['Todas', 'Pendentes', 'Concluídas']
     st.session_state['ocorrencia_selecionada'] = st.selectbox('Ocorrências:', opcoes_ocorrencia, key=f'ocorrencia_select_{st.session_state.reset_key}', index=opcoes_ocorrencia.index(st.session_state.get('ocorrencia_selecionada', 'Todas')) if st.session_state.get('ocorrencia_selecionada', 'Todas') in opcoes_ocorrencia else 0)
 
@@ -353,6 +409,58 @@ with st.sidebar:
     if st.button("Atualizar Painel", use_container_width=True):
         st.cache_data.clear(); st.rerun()
     if ultima_atualizacao: st.caption(f"Última atualização: {ultima_atualizacao.strftime('%d/%m/%Y às %H:%M')}")
+
+    st.markdown("---")
+
+    if 'confirm_export' not in st.session_state: st.session_state.confirm_export = False
+    if 'appanalise_bytes' not in st.session_state: st.session_state.appanalise_bytes = None
+
+    placeholder_sidebar = st.empty()
+    if not st.session_state.confirm_export:
+        with placeholder_sidebar.container():
+            if st.button("Gerar arquivo para AppAnálise", use_container_width=True):
+                st.session_state.confirm_export = True
+                st.rerun()
+    
+    if st.session_state.confirm_export:
+        with placeholder_sidebar.container():
+            st.warning("Confirma a seleção da(s) estação(ões) RFeye?")
+            confirm_col1, confirm_col2 = st.columns(2)
+            with confirm_col1:
+                st.markdown('<div class="confirm-yes-button">', unsafe_allow_html=True)
+                if st.button("Sim", use_container_width=True, key="confirm_yes"):
+                    with st.spinner("Gerando arquivo..."):
+                        source_cols = ['Frequência (MHz)', 'Largura (kHz)', 'Identificação', 'Processo SEI UTE']
+                        target_cols = {'Frequência (MHz)': 'Frequencia', 'Largura (kHz)': 'Largura', 'Identificação': 'Identificação', 'Processo SEI UTE': 'Processo SEI UTE'}
+                        cols_to_pull = [col for col in source_cols if col in df.columns]
+                        
+                        if not cols_to_pull:
+                            st.error("Nenhuma das colunas para o AppAnálise foi encontrada.")
+                            st.session_state.appanalise_bytes = None
+                        else:
+                            df_appanalise = df[cols_to_pull].rename(columns=target_cols)
+                            st.session_state.appanalise_bytes = to_excel(df_appanalise)
+                    
+                    st.session_state.confirm_export = False
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            with confirm_col2:
+                st.markdown('<div class="confirm-no-button">', unsafe_allow_html=True)
+                if st.button("Não", use_container_width=True, key="confirm_no"):
+                    st.session_state.confirm_export = False
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.session_state.appanalise_bytes:
+        st.download_button(
+            label="📥 Baixar Arquivo para AppAnálise",
+            data=st.session_state.appanalise_bytes,
+            file_name=f"emissoes_appanalise_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            use_container_width=True
+        )
+        st.session_state.appanalise_bytes = None
     
     st.markdown("""
     <div class="sidebar-info-box" style="margin-top: 0.5rem;">
@@ -377,32 +485,13 @@ with st.sidebar:
         st.image("ods.png", width=106)
     st.markdown('</div>', unsafe_allow_html=True)
 
-df = df_original.copy()
-if not df.empty:
-    datas_selecionadas_list = [data for data, checked in st.session_state.items() if data.startswith('date_') and checked]
-    any_date_options = any(key.startswith('date_') for key in st.session_state)
-    
-    if any_date_options and not datas_selecionadas_list:
-        df = pd.DataFrame(columns=df.columns)
-    elif datas_selecionadas_list:
-        datas_para_filtrar = [pd.to_datetime(data.replace('date_', ''), errors='coerce') for data in datas_selecionadas_list]
-        df = df.loc[df['Data'].isin(datas_para_filtrar)]
-
-    if st.session_state.get('estacao_selecionada', 'Todas') != 'Todas': df = df[df['Estação'] == st.session_state['estacao_selecionada']]
-    if st.session_state.get('faixa_selecionada', 'Todas') != 'Todas': df = df[df['Faixa de Frequência Envolvida'] == st.session_state['faixa_selecionada']]
-    if st.session_state.get('frequencia_selecionada', 'Todas') != 'Todas': df = df[df['Frequência (MHz)'] == st.session_state['frequencia_selecionada']]
-    if st.session_state.get('severidade_selecionada', 'Todas') != 'Todas': df = df[df['Severidade?'] == st.session_state['severidade_selecionada']]
-    if st.session_state.get('ocorrencia_selecionada', 'Todas') != 'Todas':
-        map_status = {'Pendentes': 'Pendente', 'Concluídas': 'Concluída'}
-        df = df[df['Situação'] == map_status[st.session_state['ocorrencia_selecionada']]]
-
 header_cols = st.columns([0.1, 0.8, 0.1])
 with header_cols[0]: st.image("logo.png", width=135)
 with header_cols[1]:
     titulo_formatado = f"<i>{titulo_data}</i>" if titulo_data == "Fora do período" else titulo_data
     st.markdown(f"""
     <div style='text-align: center;'>
-        <h1 style='margin-bottom: -7px; margin-top: -1px;'>Monitoração Remota do Espectro - COP30</h1>
+        <h1 style='margin-bottom: -15px; margin-top: -1px;'>Monitoração Remota do Espectro - COP30</h1>
         <span class='title-subtitle' style='font-size: 1.3rem; font-weight: normal;'>Dia do evento: {titulo_formatado} &nbsp;&nbsp;-&nbsp;&nbsp; Fiscais em atividade: {fiscais_hoje}</span>
     </div>
     """, unsafe_allow_html=True)
@@ -441,8 +530,6 @@ for i, data in enumerate(kpi_data):
         </div>
         """, unsafe_allow_html=True)
     
-# ALTERAÇÃO 2: Adiciona um espaçador vertical entre os KPIs e os gráficos.
-# Você pode ajustar o valor '2.5rem' para aumentar ou diminuir o espaço.
 st.markdown('<div style="margin-top: 2.5rem;"></div>', unsafe_allow_html=True)
 
 if not df.empty:
@@ -493,8 +580,30 @@ if not df.empty:
             st.subheader("Mapa das Estações")
             all_estacoes_info = pd.concat([estacoes_info, miaer_info], ignore_index=True)
             center_lat, center_lon = all_estacoes_info['lat'].mean(), all_estacoes_info['lon'].mean()
-            fig_mapa = px.scatter_mapbox(all_estacoes_info, lat="lat", lon="lon", size_max=25, text="rotulo", hover_name="rotulo", zoom=10, height=424)
-            fig_mapa.update_traces(marker=dict(size=13, color="#1A311F"), textfont_color='#1A311F', textposition='middle right')
+
+            estacoes_filtradas_mapa = st.session_state.get('estacao_selecionada', [])
+            default_color = "#1A311F"
+            selected_color = "#14337b"
+
+            all_estacoes_info['map_color'] = default_color
+            
+            if estacoes_filtradas_mapa:
+                all_estacoes_info.loc[all_estacoes_info['Estação'].isin(estacoes_filtradas_mapa), 'map_color'] = selected_color
+            
+            fig_mapa = px.scatter_mapbox(
+                all_estacoes_info, 
+                lat="lat", 
+                lon="lon", 
+                size_max=25, 
+                text="rotulo", 
+                hover_name="rotulo", 
+                zoom=10, 
+                height=424,
+                color='map_color',
+                color_discrete_map="identity"
+            )
+            fig_mapa.update_traces(marker=dict(size=13), textfont_color='#1A311F', textposition='middle right')
+            
             fig_mapa.update_layout(mapbox_style="carto-positron", mapbox_center={"lat": center_lat, "lon": center_lon}, margin={"r":0, "t":0, "l":0, "b":0}, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                                   uniformtext=dict(minsize=6, mode='show'),
                                   mapbox_layers=[
@@ -502,6 +611,7 @@ if not df.empty:
                                       {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.45959464675182,-1.413824160742325], [-48.46115955268121,-1.41541976951611], [-48.45902894923615,-1.417522902260756], [-48.45638287288467,-1.420317822531534], [-48.45765406178806,-1.422206297114926], [-48.45764136955441,-1.422452385058413], [-48.45687501383681,-1.423154480079293], [-48.45559653463967,-1.422811508724929], [-48.454740001063,-1.42206627992075], [-48.4541426707238,-1.421661972091132], [-48.45383496756163,-1.419824290338865], [-48.45959464675182,-1.413824160742325]]]}}]}'), "type": "fill", "color": "rgba(0, 0, 255, 0.5)"}
                                   ])
             st.plotly_chart(fig_mapa, use_container_width=True)
+            
     with bottom_cols[1]:
         with st.container():
             st.markdown('<div class="style-marker"></div>', unsafe_allow_html=True)
@@ -534,7 +644,7 @@ if not df.empty:
     st.markdown('<div class="page-break-before"></div>', unsafe_allow_html=True)
     
     with st.container():
-        st.markdown('<div class="style-marker"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="table-container-style"></div>', unsafe_allow_html=True)
         colunas_para_exibir = {'Data': 'Data', 'Nome': 'Região', 'Estação': 'Estação','Frequência (MHz)': 'Frequência (MHz)', 'Largura (kHz)': 'Largura (kHz)', 'Faixa de Frequência Envolvida': 'Faixa de Frequência','Autorizado?': 'Autorizado?', 'Severidade?': 'Severidade', 'Detalhes da Ocorrência': 'Detalhes','Fiscal': 'Fiscal','Situação': 'Situação'}
         colunas_existentes = [col for col in colunas_para_exibir.keys() if col in df_com_nomes.columns]
         if 'Fiscal' not in colunas_existentes and 'fiscal_warning' not in st.session_state:
@@ -553,69 +663,20 @@ if not df.empty:
         if 'Detalhes' in df_tabela.columns: df_tabela['Detalhes'] = df_tabela['Detalhes'].replace('', '-').fillna('-')
         df_para_exportar = df_tabela.copy()
         df_xlsx = to_excel(df_para_exportar)
-        col_titulo, col_botao = st.columns([0.75, 0.25])
+        col_titulo, col_botao = st.columns([0.8, 0.2])
         with col_titulo: st.subheader("Histórico geral de identificações")
-        with col_botao: st.download_button(label="📥 Exportar para Excel (.xlsx)", data=df_xlsx, file_name='historico_cop30.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', use_container_width=True)
+        with col_botao: 
+            st.download_button(
+                label="📥 Exportar (.xlsx)", 
+                data=df_xlsx, 
+                file_name='historico_cop30.xlsx', 
+                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
+                use_container_width=True
+            )
         gb = GridOptionsBuilder.from_dataframe(df_tabela)
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
         
-        st.markdown("---")
-        
-        if 'confirm_export' not in st.session_state: st.session_state.confirm_export = False
-        if 'appanalise_bytes' not in st.session_state: st.session_state.appanalise_bytes = None
-
-        btn_col1, btn_col2 = st.columns(2)
-        with btn_col1:
-            st.markdown('<div class="primary-button">', unsafe_allow_html=True)
-            if st.button("Gerar Relatório Diário - Monitoração Remota COP30", use_container_width=True):
-                st.components.v1.html("<script>window.print()</script>", height=0)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with btn_col2:
-            placeholder = st.empty()
-            if not st.session_state.confirm_export:
-                with placeholder.container():
-                    st.markdown('<div class="primary-button">', unsafe_allow_html=True)
-                    if st.button("Gerar arquivo de emissões para AppAnálise", use_container_width=True):
-                        st.session_state.confirm_export = True
-                        st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-            
-            if st.session_state.confirm_export:
-                with placeholder.container():
-                    st.warning("Confirma que selecionou a(s) estação(ões) RFeye desejada(s)?")
-                    confirm_col1, confirm_col2 = st.columns(2)
-                    with confirm_col1:
-                        if st.button("Sim", use_container_width=True, type="primary"):
-                            with st.spinner("Gerando arquivo..."):
-                                source_cols = ['Frequência (MHz)', 'Largura (kHz)', 'Identificação', 'Processo SEI UTE']
-                                target_cols = {'Frequência (MHz)': 'Frequencia', 'Largura (kHz)': 'Largura', 'Identificação': 'Identificação', 'Processo SEI UTE': 'Processo SEI UTE'}
-                                cols_to_pull = [col for col in source_cols if col in df.columns]
-                                
-                                if not cols_to_pull:
-                                    st.error("Nenhuma das colunas para o AppAnálise foi encontrada.")
-                                    st.session_state.appanalise_bytes = None
-                                else:
-                                    df_appanalise = df[cols_to_pull].rename(columns=target_cols)
-                                    st.session_state.appanalise_bytes = to_excel(df_appanalise)
-                            
-                            st.session_state.confirm_export = False
-                            st.rerun()
-
-                    with confirm_col2:
-                        if st.button("Não", use_container_width=True):
-                            st.session_state.confirm_export = False
-                            st.rerun()
-
-            if st.session_state.appanalise_bytes:
-                st.download_button(
-                    label="📥 Baixar Arquivo para AppAnálise (.xlsx)",
-                    data=st.session_state.appanalise_bytes,
-                    file_name=f"emissoes_appanalise_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                )
-                st.session_state.appanalise_bytes = None
 else:
     st.warning("Nenhum dado encontrado para a seleção atual.")
