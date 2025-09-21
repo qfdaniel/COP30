@@ -197,7 +197,15 @@ def to_excel(df: pd.DataFrame):
 def carregar_dados():
     try:
         scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        creds = Credentials.from_service_account_file("google_credentials.json", scopes=scopes)
+        
+        # --- ALTERAÇÃO PARA STREAMLIT CLOUD ---
+        # Acesso às credenciais do Google Sheets via st.secrets
+        # O conteúdo do seu google_credentials.json deve ser copiado
+        # e colado no painel do Streamlit Cloud como um 'secret'
+        # com o nome 'google_credentials'.
+        creds_json = json.loads(st.secrets["google_credentials"])
+        creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
+        
         client = gspread.authorize(creds)
         planilha = client.open("MONITORAÇÃO - COP30")
         aba_painel = planilha.worksheet("PAINEL")
