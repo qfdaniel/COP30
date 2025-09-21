@@ -105,7 +105,7 @@ def get_theme_css(theme):
 def get_full_css(theme):
     border_color = "#1A311F"
     common_css = f"""
-        .block-container {{ padding-top: 1.5rem !important; padding-bottom: 2rem; }}
+        section.main .block-container {{ padding-top: 1.5rem !important; padding-bottom: 2rem; }}
         .stImage > img {{ filter: drop-shadow(4px 4px 8px rgba(0, 0, 0, 0.4)); }}
         header[data-testid="stHeader"] {{ background-color: transparent; }}
         h3 {{ font-size: 1.1em !important; }}
