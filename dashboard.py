@@ -231,7 +231,7 @@ def to_excel(df: pd.DataFrame):
 def carregar_dados():
     try:
         scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        creds = Credentials.from_service_account_file("google_credentials.json", scopes=scopes)
+        creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
         client = gspread.authorize(creds)
         planilha = client.open("MONITORAÇÃO - COP30")
         aba_painel = planilha.worksheet("PAINEL")
