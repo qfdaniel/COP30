@@ -105,12 +105,19 @@ def get_theme_css(theme):
 def get_full_css(theme):
     border_color = "#1A311F"
     common_css = f"""
-        /* --- INÍCIO DA CORREÇÃO DA MARGEM SUPERIOR --- */
-        /* Seletor CORRETO encontrado a partir do seu screenshot */
+        /* --- TESTE VISUAL DEFINITIVO --- */
+        /* Se este é o contêiner correto, ele terá uma borda VERMELHA grossa */
         div[data-testid="stBlockContainer"] {{
-            padding-top: 10.5rem !important;
+            border: 5px solid red !important;
+            padding-top: 1rem !important;
+            margin-top: 0rem !important;
         }}
-        /* --- FIM DA CORREÇÃO --- */
+
+        /* Borda AZUL para o primeiro elemento dentro da seção principal */
+        section.main > div:first-child {{
+            border: 5px solid blue !important;
+        }}
+        /* --- FIM DO TESTE --- */
 
         .stImage > img {{ filter: drop-shadow(4px 4px 8px rgba(0, 0, 0, 0.4)); }}
         header[data-testid="stHeader"] {{ background-color: transparent; }}
@@ -612,7 +619,7 @@ if not df.empty:
             fig_mapa.update_layout(mapbox_style="carto-positron", mapbox_center={"lat": center_lat, "lon": center_lon}, margin={"r":0, "t":0, "l":0, "b":0}, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                                   uniformtext=dict(minsize=6, mode='show'),
                                   mapbox_layers=[
-                                      {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.46271165940957,-1.410547386930189], [-48.46354296701018,-1.410203920775152], [-48.46452300205883,-1.410589379729715], [-48.46481338341509,-1.410947294928633], [-48.46480901688122,-1.411743890008883], [-48.46476950492082,-1.412718397847341], [-48.46501339404546,-1.413220476289419], [-48.46505954643188,-1.413593356218595], [-48.46299946948039,-1.415682109733712], [-48.46223745889785,-1.41493726617121], [-48.46193440440009,-1.41506754383678], [-48.46160981147195,-1.415618320052126], [-48.46236515358898,-1.41646519254085], [-48.46029976924051,-1.418538693038281], [-48.45921609865986,-1.417408620572469], [-48.4612069857882,-1.41539858384322], [-48.45963018655848,-1.413805502459938], [-48.46271165940957,-1.410547386930189]]]}}]}'), "type": "fill", "color": "rgba(0, 255, 0, 0.5)"},
+                                      {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.46271165940957,-1.410547386930189], [-48.46354296701018,-1.410203920775152], [-48.46452300205883,-1.410589379729715], [-48.46481338341509,-1.410947294928633], [-48.46480901688122,-1.411743890008883], [-48.46476950492082,-1.ax412718397847341], [-48.46501339404546,-1.413220476289419], [-48.46505954643188,-1.413593356218595], [-48.46299946948039,-1.415682109733712], [-48.46223745889785,-1.41493726617121], [-48.46193440440009,-1.41506754383678], [-48.46160981147195,-1.415618320052126], [-48.46236515358898,-1.41646519254085], [-48.46029976924051,-1.418538693038281], [-48.45921609865986,-1.417408620572469], [-48.4612069857882,-1.41539858384322], [-48.45963018655848,-1.413805502459938], [-48.46271165940957,-1.410547386930189]]]}}]}'), "type": "fill", "color": "rgba(0, 255, 0, 0.5)"},
                                       {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.45959464675182,-1.413824160742325], [-48.46115955268121,-1.41541976951611], [-48.45902894923615,-1.417522902260756], [-48.45638287288467,-1.420317822531534], [-48.45765406178806,-1.422206297114926], [-48.45764136955441,-1.422452385058413], [-48.45687501383681,-1.423154480079293], [-48.45559653463967,-1.422811508724929], [-48.454740001063,-1.42206627992075], [-48.4541426707238,-1.421661972091132], [-48.45383496756163,-1.419824290338865], [-48.45959464675182,-1.413824160742325]]]}}]}'), "type": "fill", "color": "rgba(0, 0, 255, 0.5)"}
                                   ])
             st.plotly_chart(fig_mapa, use_container_width=True)
