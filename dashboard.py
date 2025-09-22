@@ -108,7 +108,7 @@ def get_full_css(theme):
         /* --- INÍCIO DA CORREÇÃO DA MARGEM SUPERIOR --- */
         /* Seletor CORRETO encontrado a partir do seu screenshot */
         div[data-testid="stBlockContainer"] {{
-            padding-top: 1.5rem !important;
+            padding-top: 10.5rem !important;
         }}
         /* --- FIM DA CORREÇÃO --- */
 
