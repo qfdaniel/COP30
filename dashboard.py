@@ -503,6 +503,7 @@ with header_cols[1]:
     """, unsafe_allow_html=True)
 with header_cols[2]: st.image("anatel.png", width=105)
 st.markdown("---")
+st.warning("TESTE DE ATUALIZAÇÃO - 22/09/2025 14:19")
 
 if df.empty:
     st.info("Nenhum dado encontrado para a seleção atual. Por favor, ajuste os filtros na barra lateral.")
