@@ -119,7 +119,7 @@ def get_full_css(theme):
         .style-marker, .table-container-style {{ display: none; }}
         
         section.main hr {{
-            margin-top: -0.5rem !important;
+            margin-top: -8rem !important;
             margin-bottom: 0.5rem !important;
         }}
 
