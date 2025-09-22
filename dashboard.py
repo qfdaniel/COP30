@@ -19,222 +19,29 @@ st.set_page_config(
 )
 
 # --- ATUALIZAÇÃO AUTOMÁTICA ---
-# Esta linha força o navegador a recarregar a página inteira a cada 300 segundos (5 minutos)
 components.html("<meta http-equiv='refresh' content='300'>", height=0)
 
+# --- Carrega o CSS customizado a partir de um arquivo externo ---
+try:
+    st.markdown('<style>' + open('style.css').read() + '</style>', unsafe_allow_html=True)
+except FileNotFoundError:
+    st.error("Arquivo style.css não encontrado. Por favor, crie o arquivo no mesmo diretório.")
 
-# --- 1. GERENCIAMENTO DE TEMA E ESTILOS (CSS) ---
+
+# --- DEMAIS FUNÇÕES E LÓGICA DO PAINEL ---
 
 BASE_PALETTE = ["#1A311F", "#14337b", "#80B525", "#8D877D", "#DF1B1D", "#DBDAC9"]
 VARIANT_PALETTE = ["#4A6D55", "#4464A7", "#608A1B", "#BDBAB3", "#E85C5D", "#B3B2A5"]
 COP30_PALETTE = BASE_PALETTE + VARIANT_PALETTE
 
+if 'theme' not in st.session_state:
+    st.session_state.theme = 'Light'
+    
 def toggle_theme():
     if st.session_state.get('theme_toggle', False):
         st.session_state.theme = 'Dark'
     else:
         st.session_state.theme = 'Light'
-
-if 'theme' not in st.session_state:
-    st.session_state.theme = 'Light'
-
-def get_theme_css(theme):
-    border_color = "#1A311F"
-    
-    report_button_css = """
-    section.main .primary-button .stButton > button {
-        border-radius: 8px !important; font-weight: bold !important; border: 1px solid #14337b !important;
-        background-color: #14337b !important; color: white !important; transition: all 0.3s ease;
-    }
-    section.main .primary-button .stButton > button:hover {
-        background-color: #2a4e9b !important; border-color: #2a4e9b !important; color: white !important;
-    }
-    """
-    
-    print_css = """
-    @media print {
-        @page { size: landscape; margin: 15mm; }
-        body, .stApp { background: white !important; color: black !important; }
-        section[data-testid="stSidebar"], header[data-testid="stHeader"], .primary-button { display: none !important; }
-        .main .block-container, section.main { width: 100% !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; }
-        h1, h2, h3, p, .stMarkdown, .kpi-label, .kpi-value { color: black !important; text-shadow: none !important; }
-        .style-marker + div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] { border: 1px solid #AAAAAA !important; box-shadow: none !important; }
-        .kpi-box { background-image: none !important; background-color: #EEEEEE !important; border: 1px solid #CCCCCC; }
-        .page-break-before { break-before: page; }
-    }
-    """
-    
-    kpi_css = """
-    .kpi-box {
-        position: relative;
-        border-radius: 10px; padding: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-        text-align: center; height: 128px; display: flex; flex-direction: column;
-        justify-content: center; align-items: center;
-    }
-    .kpi-label {
-        font-weight: bold; font-size: 1.1em;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
-        line-height: 1.2; margin-bottom: 8px; color: white;
-    }
-    .kpi-value {
-        font-weight: bold !important; font-size: 3.0em;
-        line-height: 1.1;
-    }
-    .info-icon-container {
-        position: absolute; bottom: 8px; right: 8px;
-    }
-    .info-icon {
-        display: inline-block; width: 16px; height: 16px; line-height: 16px;
-        text-align: center; border-radius: 50%; background-color: rgba(255, 255, 255, 0.5);
-        color: #1A311F; font-size: 11px; font-weight: bold; cursor: pointer;
-    }
-    .tooltip-text {
-        visibility: hidden; width: 220px; background-color: #333; color: #fff;
-        text-align: center; border-radius: 6px; padding: 8px;
-        position: absolute; z-index: 1; bottom: 125%; left: 50%;
-        margin-left: -110px; opacity: 0; transition: opacity 0.3s;
-        font-size: 0.9em;
-    }
-    .info-icon-container:hover .tooltip-text {
-        visibility: visible; opacity: 1;
-    }
-    """
-    
-    return f"<style>{print_css}{report_button_css}{kpi_css}{get_full_css(theme)}</style>"
-
-def get_full_css(theme):
-    border_color = "#1A311F"
-    common_css = f"""
-        /* --- TESTE VISUAL DEFINITIVO --- */
-        /* Se este é o contêiner correto, ele terá uma borda VERMELHA grossa */
-        div[data-testid="stBlockContainer"] {{
-            border: 5px solid red !important;
-            padding-top: 1rem !important;
-            margin-top: 0rem !important;
-        }}
-
-        /* Borda AZUL para o primeiro elemento dentro da seção principal */
-        section.main > div:first-child {{
-            border: 5px solid blue !important;
-        }}
-        /* --- FIM DO TESTE --- */
-
-        .stImage > img {{ filter: drop-shadow(4px 4px 8px rgba(0, 0, 0, 0.4)); }}
-        header[data-testid="stHeader"] {{ background-color: transparent; }}
-        h3 {{ font-size: 1.1em !important; }}
-        .style-marker, .table-container-style {{ display: none; }}
-        
-        section.main hr {{
-            margin-top: -0.5rem !important;
-            margin-bottom: 0.5rem !important;
-        }}
-
-        .style-marker + div[data-testid="stVerticalBlock"] {{
-            margin-bottom: 0.1rem !important;
-        }}
-
-        [data-testid="stSidebar"] h1 {{ margin-top: -5px; }}
-        [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] .stMultiSelect, [data-testid="stSidebar"] [data-testid="stExpander"] summary, .sidebar-info-box {{ 
-            border-radius: 8px; padding: 10px; 
-        }}
-        [data-testid="stSidebar"] .stButton>button {{ border-radius: 8px; font-weight: bold; transition: all 0.3s ease; }}
-        section[data-testid="stSidebar"] button:first-child, button[aria-label="Open sidebar"] {{ border: 2px solid #8D877D; border-radius: 5px; }}
-        div[data-testid="stSidebar"] .st-emotion-cache-1pxx5r6, div[data-testid="stSidebar"] .st-emotion-cache-1n6o325 {{ margin-top: -1.5rem !important; }}
-        [data-testid="stSidebar"] hr {{
-            margin-top: 0.5rem !important;
-            margin-bottom: 0.5rem !important;
-        }}
-        [data-testid="stSidebar"] .stSelectbox + hr, [data-testid="stSidebar"] .stMultiSelect + hr, [data-testid="stSidebar"] .stButton + hr {{
-            margin-top: 0.5rem !important;
-            margin-bottom: 0.5rem !important;
-        }}
-        [data-testid="stSidebar"] .stCaptionContainer + .sidebar-info-box {{
-            margin-top: -0.5rem !important;
-        }}
-        .ag-header-cell-label {{ justify-content: center; font-weight: bold; }}
-
-        /* CSS para botões de confirmação (Sim/Não) */
-        .confirm-yes-button .stButton > button {{
-            background-color: #4CAF50 !important;
-            color: white !important;
-            border: 1px solid #388E3C !important;
-        }}
-        .confirm-yes-button .stButton > button:hover {{
-            background-color: #66BB6A !important;
-            border-color: #4CAF50 !important;
-            color: white !important;
-        }}
-        .confirm-no-button .stButton > button {{
-            background-color: #DF1B1D !important;
-            color: white !important;
-            border: 1px solid #C62828 !important;
-        }}
-        .confirm-no-button .stButton > button:hover {{
-            background-color: #E57373 !important;
-            border-color: #DF1B1D !important;
-            color: white !important;
-        }}
-
-        /* Novo estilo para o container da tabela */
-        .table-container-style + div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] {{
-            border: 1px solid {border_color};
-            border-radius: 15px;
-            padding: 15px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-        }}
-    """
-    if theme == 'Dark':
-        return common_css + f"""
-            .style-marker + div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] {{
-                border: 2px solid {border_color}; border-radius: 15px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-            }}
-            .stApp {{ background-color: #1E1E1E; }} 
-            h1, h3, .title-subtitle span {{ color: #DBDAC9 !important; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); }}
-            h2 {{ color: #FFFFFF; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); }}
-            button[aria-label="Open sidebar"] svg, button[aria-label="Close sidebar"] svg {{
-                fill: #DBDAC9 !important;
-            }}
-            .kpi-value {{ color: white !important; }}
-            [data-testid="stSidebar"] {{ background-image: linear-gradient(to bottom, #2C2C2C, #1E1E1E); }}
-            [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p {{ color: #E0E0E0; }}
-            [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] .stMultiSelect, [data-testid="stSidebar"] [data-testid="stExpander"] summary, .sidebar-info-box {{ 
-                background-color: #3C3C3C; border: 1px solid #555555; 
-            }}
-            .sidebar-info-box * {{ color: #BDBAB3 !important; }}
-            [data-testid="stSidebar"] .stSelectbox label, [data-testid="stSidebar"] .stMultiSelect label, [data-testid="stSidebar"] [data-testid="stExpander"] summary p, [data-testid="stSidebar"] .stCheckbox p {{ color: #E0E0E0 !important; }}
-            [data-testid="stSidebar"] [data-testid="stExpander"] summary svg {{ fill: #E0E0E0 !important; }}
-            [data-testid="stSidebar"] .st-emotion-cache-s492w3 {{ border: 1px solid #555555; background-color: #2C2C2C; color: #E0E0E0; }}
-            [data-testid="stSidebar"] small {{ color: #DF1B1D !important; font-weight: bold; }}
-            [data-testid="stSidebar"] .stButton>button {{ background-color: #3C3C3C; color: #E0E0E0; border: 1px solid #555555; }}
-            [data-testid="stSidebar"] .stButton>button:hover {{ background-color: #0047AB; color: white; border-color: #0047AB; }}
-            .ag-theme-alpine-dark .ag-row-even {{ background-color: #2A3F2A !important; }}
-        """
-    else: # Light theme
-        return common_css + f"""
-            .style-marker + div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] {{
-                border: 2px solid {border_color}; border-radius: 15px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.25);
-            }}
-            .stApp {{ background-color: #DBDAC9; }} h1, h2, h3 {{ color: #1A311F; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2); }}
-            .kpi-value {{ color: #1A311F !important; }}
-            [data-testid="stSidebar"] {{ background-image: linear-gradient(to bottom, #F5EFE6, #E8D5C4); }}
-            [data-testid="stSidebar"] h1, [data-testid="stSidebar"] p, [data-testid="stSidebar"] .stCheckbox p {{ color: #38322C; }}
-            [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] .stMultiSelect, [data-testid="stSidebar"] [data-testid="stExpander"] summary, .sidebar-info-box {{ 
-                background-color: #E8D5C4; border: 1px solid #C3A995; 
-            }}
-            [data-testid="stSidebar"] .stSelectbox label, [data-testid="stSidebar"] .stMultiSelect label, [data-testid="stSidebar"] [data-testid="stExpander"] summary p {{ color: #38322C !important; }}
-            [data-testid="stSidebar"] [data-testid="stExpander"] summary svg {{ fill: #38322C; }}
-            [data-testid="stSidebar"] .st-emotion-cache-s492w3 {{ border: 1px solid #C3A995; background-color: #F5EFE6; color: #38322C; }}
-            [data-testid="stSidebar"] small {{ color: #DF1B1D !important; font-weight: bold; }}
-            [data-testid="stSidebar"] .stButton>button {{ background-color: #E8D5C4; color: #38322C; border: 1px solid #C3A995; }}
-            [data-testid="stSidebar"] .stButton>button:hover {{ background-color: #0047AB; color: white; border-color: #0047AB; }}
-            .ag-theme-streamlit .ag-row-even {{ background-color: #E6F5E6 !important; }}
-        """
-
-# --- LINHA DE TESTE FUNDAMENTAL ---
-# A linha original foi comentada e a linha de teste foi adicionada abaixo.
-# st.markdown(get_theme_css(st.session_state.theme), unsafe_allow_html=True)
-st.markdown("<style>body { color: red !important; }</style>", unsafe_allow_html=True)
-
 
 @st.cache_data
 def to_excel(df: pd.DataFrame):
@@ -623,7 +430,7 @@ if not df.empty:
             fig_mapa.update_layout(mapbox_style="carto-positron", mapbox_center={"lat": center_lat, "lon": center_lon}, margin={"r":0, "t":0, "l":0, "b":0}, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                                   uniformtext=dict(minsize=6, mode='show'),
                                   mapbox_layers=[
-                                      {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.46271165940957,-1.410547386930189], [-48.46354296701018,-1.410203920775152], [-48.46452300205883,-1.410589379729715], [-48.46481338341509,-1.410947294928633], [-48.46480901688122,-1.411743890008883], [-48.46476950492082,-1.412718397847341], [-48.46501339404546,-1.413220476289419], [-48.46505954643188,-1.413593356218595], [-48.46299946948039,-1.415682109733712], [-48.46223745889785,-1.41493726617121], [-48.46193440440009,-1.41506754383678], [-48.46160981147195,-1.415618320052126], [-48.46236515358898,-1.41646519254085], [-48.46029976924051,-1.418538693038281], [-48.45921609865986,-1.417408620572469], [-48.4612069857882,-1.41539858384322], [-48.45963018655848,-1.413805502459938], [-48.46271165940957,-1.410547386930189]]]}}]}'), "type": "fill", "color": "rgba(0, 255, 0, 0.5)"},
+                                      {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.46271165940957,-1.410547386930189], [-48.46354296701018,-1.410203920775152], [-48.46452300205883,-1.410589379729715], [-48.46481338341509,-1.410947294928633], [-48.46480901688122,-1.411743890008883], [-48.46476950492082,-1.ax412718397847341], [-48.46501339404546,-1.413220476289419], [-48.46505954643188,-1.413593356218595], [-48.46299946948039,-1.415682109733712], [-48.46223745889785,-1.41493726617121], [-48.46193440440009,-1.41506754383678], [-48.46160981147195,-1.415618320052126], [-48.46236515358898,-1.41646519254085], [-48.46029976924051,-1.418538693038281], [-48.45921609865986,-1.417408620572469], [-48.4612069857882,-1.41539858384322], [-48.45963018655848,-1.413805502459938], [-48.46271165940957,-1.410547386930189]]]}}]}'), "type": "fill", "color": "rgba(0, 255, 0, 0.5)"},
                                       {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.45959464675182,-1.413824160742325], [-48.46115955268121,-1.41541976951611], [-48.45902894923615,-1.417522902260756], [-48.45638287288467,-1.420317822531534], [-48.45765406178806,-1.422206297114926], [-48.45764136955441,-1.422452385058413], [-48.45687501383681,-1.423154480079293], [-48.45559653463967,-1.422811508724929], [-48.454740001063,-1.42206627992075], [-48.4541426707238,-1.421661972091132], [-48.45383496756163,-1.419824290338865], [-48.45959464675182,-1.413824160742325]]]}}]}'), "type": "fill", "color": "rgba(0, 0, 255, 0.5)"}
                                   ])
             st.plotly_chart(fig_mapa, use_container_width=True)
