@@ -112,7 +112,7 @@ def get_full_css(theme):
         }}
         /* --- FIM DA CORREÇÃO --- */
 
-        .block-container {{ padding-top: 2rem !important; padding-bottom: 2rem; }}
+        .block-container {{ padding-top: 1rem !important; padding-bottom: 2rem; }}
         .stImage > img {{ filter: drop-shadow(4px 4px 8px rgba(0, 0, 0, 0.4)); }}
         header[data-testid="stHeader"] {{ background-color: transparent; }}
         h3 {{ font-size: 1.1em !important; }}
