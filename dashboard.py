@@ -107,8 +107,8 @@ def get_full_css(theme):
     common_css = f"""
         /* --- INÍCIO DA CORREÇÃO DA MARGEM SUPERIOR --- */
         /* Puxa o primeiro bloco de conteúdo para cima para remover o espaço extra */
-        section.main > div:first-child {{
-            margin-top: -5rem !important;
+        div[data-testid="stAppViewContainer"] > section.main > div:first-child {{
+            margin-top: -8rem !important;
         }}
         /* --- FIM DA CORREÇÃO --- */
 
@@ -119,7 +119,7 @@ def get_full_css(theme):
         .style-marker, .table-container-style {{ display: none; }}
         
         section.main hr {{
-            margin-top: -8rem !important;
+            margin-top: -0.5rem !important;
             margin-bottom: 0.5rem !important;
         }}
 
@@ -203,7 +203,7 @@ def get_full_css(theme):
             [data-testid="stSidebar"] .stButton>button:hover {{ background-color: #0047AB; color: white; border-color: #0047AB; }}
             .ag-theme-alpine-dark .ag-row-even {{ background-color: #2A3F2A !important; }}
         """
-    else:
+    else: # Light theme
         return common_css + f"""
             .style-marker + div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] {{
                 border: 2px solid {border_color}; border-radius: 15px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.25);
@@ -503,7 +503,6 @@ with header_cols[1]:
     """, unsafe_allow_html=True)
 with header_cols[2]: st.image("anatel.png", width=105)
 st.markdown("---")
-st.warning("TESTE DE ATUALIZAÇÃO - 22/09/2025 14:19")
 
 if df.empty:
     st.info("Nenhum dado encontrado para a seleção atual. Por favor, ajuste os filtros na barra lateral.")
