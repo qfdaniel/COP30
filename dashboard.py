@@ -20,7 +20,7 @@ st.set_page_config(
 
 # --- ATUALIZAÇÃO AUTOMÁTICA ---
 # Esta linha força o navegador a recarregar a página inteira a cada 300 segundos (5 minutos)
-components.html("<meta http-equiv='refresh' content='300'>", height=0)
+#components.html("<meta http-equiv='refresh' content='300'>", height=0)
 
 
 # --- 1. GERENCIAMENTO DE TEMA E ESTILOS (CSS) ---
@@ -334,7 +334,7 @@ if not df.empty:
     if st.session_state.get('frequencia_selecionada', 'Todas') != 'Todas': df = df[df['Frequência (MHz)'] == st.session_state['frequencia_selecionada']]
     if st.session_state.get('severidade_selecionada', 'Todas') != 'Todas': df = df[df['Severidade?'] == st.session_state['severidade_selecionada']]
     if st.session_state.get('ocorrencia_selecionada', 'Todas') != 'Todas':
-        map_status = {'Pendentes': 'Pendente', 'Concluídas': 'Concluída'}
+        map_status = {'Pendentes': 'Pendente', 'Concluídas': 'Concluído'}
         df = df[df['Situação'] == map_status[st.session_state['ocorrencia_selecionada']]]
 
 with st.sidebar:
