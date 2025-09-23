@@ -264,6 +264,7 @@ def carregar_dados():
         st.error(f"Erro ao carregar os dados: {e}")
         return pd.DataFrame(), None, "Erro", "0", 0, 0, 0
 
+# --- INÍCIO DA SEÇÃO CORRIGIDA E CENTRALIZADA ---
 estacoes_info = pd.DataFrame({
     'Estação': ['RFeye002129', 'RFeye002175', 'RFeye002315', 'RFeye002012', 'RFeye002303', 'RFeye002093'],
     'Nome': ['MANGUEIRINHO', 'ALDEIA', 'DOCAS', 'OUTEIRO', 'PARQUE da CIDADE', 'ANATEL'],
@@ -272,9 +273,14 @@ estacoes_info = pd.DataFrame({
     'size': 25
 })
 miaer_info = pd.DataFrame({'Estação': ['Miaer'], 'Nome': ['CENSIPAM'], 'lat': [-1.409319], 'lon': [-48.462516], 'size': 25})
-for df_info in [estacoes_info, miaer_info]:
+cellpl_info = pd.DataFrame({'Estação': ['CWSM211022'], 'Nome': ['UFPA'], 'lat': [-1.476756], 'lon': [-48.456606], 'size': 25})
+
+# Loop único para processar TODOS os dataframes de uma vez
+for df_info in [estacoes_info, miaer_info, cellpl_info]:
     df_info['NomeFormatado'] = df_info['Nome'].str.title()
     df_info['rotulo'] = df_info['Estação'] + ' - ' + df_info['NomeFormatado']
+# --- FIM DA SEÇÃO CORRIGIDA ---
+
 
 df_original, ultima_atualizacao, titulo_data, fiscais_hoje, total_pendentes_original, bsr_jammers_count, erbs_fake_count = carregar_dados()
 if df_original is None: st.warning("Não foi possível carregar os dados da planilha."); st.stop()
@@ -297,8 +303,9 @@ def clear_filters():
 with st.sidebar:
     st.toggle('Modo Dark', key='theme_toggle', value=(st.session_state.theme == 'Dark'), on_change=toggle_theme)
     st.title("Filtros")
-
-    estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e != 'Miaer'])
+    
+    # Lista de estações para os filtros (excluindo as fixas)
+    estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e not in ['Miaer', 'CWSM211022']])
 
     if not df_original.empty:
         df_filtros = df_original.copy().dropna(subset=['Data'])
@@ -394,7 +401,7 @@ with st.sidebar:
     st.markdown('</div>', unsafe_allow_html=True)
 
 
-# --- Bloco de Filtragem (MOVIMENTADO PARA A POSIÇÃO CORRETA) ---
+# --- Bloco de Filtragem ---
 df = df_original.copy()
 if not df.empty:
     if 'Situação' in df.columns:
@@ -429,7 +436,7 @@ if not df.empty:
         df = df[df['Situação'] == map_status[st.session_state.ocorrencia_selecionada]]
 
 
-# --- LÓGICA DE EXPORTAÇÃO (MOVIMENTADA PARA A POSIÇÃO CORRETA) ---
+# --- LÓGICA DE EXPORTAÇÃO ---
 if not st.session_state.confirm_export:
     with placeholder_sidebar.container():
         if st.button("Gerar arquivo para AppAnálise", use_container_width=True):
@@ -541,7 +548,7 @@ if not df.empty:
             data_estacao.columns = ['Nome', 'count']
             data_estacao['label'] = data_estacao['Nome'] + ' (' + data_estacao['count'].astype(str) + ')'
             fig_treemap_estacao = px.treemap(data_estacao, path=['label'], values='count', color='Nome', color_discrete_sequence=COP30_PALETTE)
-            fig_treemap_estacao.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=400, paper_bgcolor='rgba(141, 135, 121, 0.2)', plot_bgcolor='rgba(0,0,0,0)')
+            fig_treemap_estacao.update_layout(margin=dict(t=1, b=10, l=10, r=10), height=400, paper_bgcolor='rgba(141, 135, 121, 0.2)', plot_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_treemap_estacao, use_container_width=True)
     with top_col2:
         with st.container():
@@ -576,7 +583,11 @@ if not df.empty:
         with st.container():
             st.markdown('<div class="style-marker"></div>', unsafe_allow_html=True)
             st.subheader("Mapa das Estações")
-            all_estacoes_info = pd.concat([estacoes_info, miaer_info], ignore_index=True)
+            
+            # --- INÍCIO DA LINHA CORRIGIDA ---
+            all_estacoes_info = pd.concat([estacoes_info, miaer_info, cellpl_info], ignore_index=True)
+            # --- FIM DA LINHA CORRIGIDA ---
+            
             center_lat, center_lon = all_estacoes_info['lat'].mean(), all_estacoes_info['lon'].mean()
 
             estacoes_filtradas_mapa = [s for s in estacoes_lista if st.session_state.get(f'station_{s}')]
@@ -604,11 +615,11 @@ if not df.empty:
             fig_mapa.update_traces(marker=dict(size=13), textfont_color='#1A311F', textposition='middle right')
             
             fig_mapa.update_layout(mapbox_style="carto-positron", mapbox_center={"lat": center_lat, "lon": center_lon}, margin={"r":0, "t":0, "l":0, "b":0}, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                                  uniformtext=dict(minsize=6, mode='show'),
-                                  mapbox_layers=[
-                                      {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.46271165940957,-1.410547386930189], [-48.46354296701018,-1.410203920775152], [-48.46452300205883,-1.410589379729715], [-48.46481338341509,-1.410947294928633], [-48.46480901688122,-1.411743890008883], [-48.46476950492082,-1.412718397847341], [-48.46501339404546,-1.413220476289419], [-48.46505954643188,-1.413593356218595], [-48.46299946948039,-1.415682109733712], [-48.46223745889785,-1.41493726617121], [-48.46193440440009,-1.41506754383678], [-48.46160981147195,-1.415618320052126], [-48.46236515358898,-1.41646519254085], [-48.46029976924051,-1.418538693038281], [-48.45921609865986,-1.417408620572469], [-48.4612069857882,-1.41539858384322], [-48.45963018655848,-1.413805502459938], [-48.46271165940957,-1.410547386930189]]]}}]}'), "type": "fill", "color": "rgba(0, 255, 0, 0.5)"},
-                                      {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.45959464675182,-1.413824160742325], [-48.46115955268121,-1.41541976951611], [-48.45902894923615,-1.417522902260756], [-48.45638287288467,-1.420317822531534], [-48.45765406178806,-1.422206297114926], [-48.45764136955441,-1.422452385058413], [-48.45687501383681,-1.423154480079293], [-48.45559653463967,-1.422811508724929], [-48.454740001063,-1.42206627992075], [-48.4541426707238,-1.421661972091132], [-48.45383496756163,-1.419824290338865], [-48.45959464675182,-1.413824160742325]]]}}]}'), "type": "fill", "color": "rgba(0, 0, 255, 0.5)"}
-                                  ])
+                                    uniformtext=dict(minsize=6, mode='show'),
+                                    mapbox_layers=[
+                                        {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.46271165940957,-1.410547386930189], [-48.46354296701018,-1.410203920775152], [-48.46452300205883,-1.410589379729715], [-48.46481338341509,-1.410947294928633], [-48.46480901688122,-1.411743890008883], [-48.46476950492082,-1.412718397847341], [-48.46501339404546,-1.413220476289419], [-48.46505954643188,-1.413593356218595], [-48.46299946948039,-1.415682109733712], [-48.46223745889785,-1.41493726617121], [-48.46193440440009,-1.41506754383678], [-48.46160981147195,-1.415618320052126], [-48.46236515358898,-1.41646519254085], [-48.46029976924051,-1.418538693038281], [-48.45921609865986,-1.417408620572469], [-48.4612069857882,-1.41539858384322], [-48.45963018655848,-1.413805502459938], [-48.46271165940957,-1.410547386930189]]]}}]}'), "type": "fill", "color": "rgba(0, 255, 0, 0.5)"},
+                                        {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.45959464675182,-1.413824160742325], [-48.46115955268121,-1.41541976951611], [-48.45902894923615,-1.417522902260756], [-48.45638287288467,-1.420317822531534], [-48.45765406178806,-1.422206297114926], [-48.45764136955441,-1.422452385058413], [-48.45687501383681,-1.423154480079293], [-48.45559653463967,-1.422811508724929], [-48.454740001063,-1.42206627992075], [-48.4541426707238,-1.421661972091132], [-48.45383496756163,-1.419824290338865], [-48.45959464675182,-1.413824160742325]]]}}]}'), "type": "fill", "color": "rgba(0, 0, 255, 0.5)"}
+                                    ])
             st.plotly_chart(fig_mapa, use_container_width=True)
             
     with bottom_cols[1]:
