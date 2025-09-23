@@ -19,12 +19,10 @@ st.set_page_config(
 )
 
 # --- ATUALIZAÇÃO AUTOMÁTICA ---
-# Esta linha força o navegador a recarregar a página inteira a cada 300 segundos (5 minutos)
 #components.html("<meta http-equiv='refresh' content='300'>", height=0)
 
 
 # --- 1. GERENCIAMENTO DE TEMA E ESTILOS (CSS) ---
-
 BASE_PALETTE = ["#1A311F", "#14337b", "#80B525", "#8D877D", "#DF1B1D", "#DBDAC9"]
 VARIANT_PALETTE = ["#4A6D55", "#4464A7", "#608A1B", "#BDBAB3", "#E85C5D", "#B3B2A5"]
 COP30_PALETTE = BASE_PALETTE + VARIANT_PALETTE
@@ -39,6 +37,7 @@ if 'theme' not in st.session_state:
     st.session_state.theme = 'Light'
 
 def get_theme_css(theme):
+    # ... (código de CSS permanece o mesmo)
     border_color = "#1A311F"
     
     report_button_css = """
@@ -105,28 +104,21 @@ def get_theme_css(theme):
 def get_full_css(theme):
     border_color = "#1A311F"
     common_css = f"""
-        /* --- INÍCIO DA CORREÇÃO DA MARGEM SUPERIOR --- */
-        /* Puxa o primeiro bloco de conteúdo para cima para remover o espaço extra */
         section.main > div:first-child {{
             margin-top: -5rem !important;
         }}
-        /* --- FIM DA CORREÇÃO --- */
-
         .block-container {{ padding-top: 2rem !important; padding-bottom: 2rem; }}
         .stImage > img {{ filter: drop-shadow(4px 4px 8px rgba(0, 0, 0, 0.4)); }}
         header[data-testid="stHeader"] {{ background-color: transparent; }}
         h3 {{ font-size: 1.1em !important; }}
         .style-marker, .table-container-style {{ display: none; }}
-        
         section.main hr {{
             margin-top: -0.5rem !important;
             margin-bottom: 0.5rem !important;
         }}
-
         .style-marker + div[data-testid="stVerticalBlock"] {{
             margin-bottom: 0.1rem !important;
         }}
-
         [data-testid="stSidebar"] h1 {{ margin-top: -5px; }}
         [data-testid="stSidebar"] .stSelectbox, [data-testid="stSidebar"] .stMultiSelect, [data-testid="stSidebar"] [data-testid="stExpander"] summary, .sidebar-info-box {{ 
             border-radius: 8px; padding: 10px; 
@@ -146,35 +138,20 @@ def get_full_css(theme):
             margin-top: -0.5rem !important;
         }}
         .ag-header-cell-label {{ justify-content: center; font-weight: bold; }}
-
-        /* CSS para botões de confirmação (Sim/Não) */
         .confirm-yes-button .stButton > button {{
-            background-color: #4CAF50 !important;
-            color: white !important;
-            border: 1px solid #388E3C !important;
+            background-color: #4CAF50 !important; color: white !important; border: 1px solid #388E3C !important;
         }}
         .confirm-yes-button .stButton > button:hover {{
-            background-color: #66BB6A !important;
-            border-color: #4CAF50 !important;
-            color: white !important;
+            background-color: #66BB6A !important; border-color: #4CAF50 !important; color: white !important;
         }}
         .confirm-no-button .stButton > button {{
-            background-color: #DF1B1D !important;
-            color: white !important;
-            border: 1px solid #C62828 !important;
+            background-color: #DF1B1D !important; color: white !important; border: 1px solid #C62828 !important;
         }}
         .confirm-no-button .stButton > button:hover {{
-            background-color: #E57373 !important;
-            border-color: #DF1B1D !important;
-            color: white !important;
+            background-color: #E57373 !important; border-color: #DF1B1D !important; color: white !important;
         }}
-
-        /* Novo estilo para o container da tabela */
         .table-container-style + div[data-testid="stVerticalBlock"] > div[data-testid="element-container"] {{
-            border: 1px solid {border_color};
-            border-radius: 15px;
-            padding: 15px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            border: 1px solid {border_color}; border-radius: 15px; padding: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.3);
         }}
     """
     if theme == 'Dark':
@@ -242,20 +219,20 @@ def carregar_dados():
         planilha = client.open("MONITORAÇÃO - COP30")
         aba_painel = planilha.worksheet("PAINEL")
         
-        intervalo_tabela = 'A1:AL' 
+        intervalo_tabela = 'A1:AL'
         dados_lista = aba_painel.get(intervalo_tabela)
         headers = dados_lista.pop(0)
-        df = pd.DataFrame(dados_lista, columns=headers)
+        df_return = pd.DataFrame(dados_lista, columns=headers)
 
         total_pendentes = 0
         bsr_jammers_count = 0
         erbs_fake_count = 0
-        if not df.empty:
-            df = df[df['Faixa de Frequência Envolvida'].astype(str).str.strip() != '']
-            df['Data'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
-            if 'Detalhes da Ocorrência' in df.columns: df['Detalhes da Ocorrência'].replace('', '-', inplace=True)
-            else: df['Detalhes da Ocorrência'] = '-'
-            if 'Situação' in df.columns: total_pendentes = (df['Situação'] == 'Pendente').sum()
+        if not df_return.empty:
+            df_return = df_return[df_return['Faixa de Frequência Envolvida'].astype(str).str.strip() != '']
+            df_return['Data'] = pd.to_datetime(df_return['Data'], errors='coerce', dayfirst=True)
+            if 'Detalhes da Ocorrência' in df_return.columns: df_return['Detalhes da Ocorrência'].replace('', '-', inplace=True)
+            else: df_return['Detalhes da Ocorrência'] = '-'
+            if 'Situação' in df_return.columns: total_pendentes = (df_return['Situação'] == 'Pendente').sum()
         
         fiscais_datas_str = aba_painel.get('W1:AL1')[0]
         fiscais_valores = aba_painel.get('W2:AL2')[0]
@@ -282,7 +259,7 @@ def carregar_dados():
         
         titulo_data = hoje_curto_str if hoje_completo_str in fiscais_por_dia else "Fora do período"
             
-        return df, datetime.now(pytz.timezone('America/Sao_Paulo')), titulo_data, fiscais_hoje, total_pendentes, bsr_jammers_count, erbs_fake_count
+        return df_return, datetime.now(pytz.timezone('America/Sao_Paulo')), titulo_data, fiscais_hoje, total_pendentes, bsr_jammers_count, erbs_fake_count
     except Exception as e:
         st.error(f"Erro ao carregar os dados: {e}")
         return pd.DataFrame(), None, "Erro", "0", 0, 0, 0
@@ -306,9 +283,9 @@ if 'reset_key' not in st.session_state: st.session_state.reset_key = 0
 def clear_filters():
     keys_to_delete = []
     for key in st.session_state.keys():
-        if key.startswith('date_') or key in [
+        if key.startswith(('date_', 'station_')) or key in [
             'faixa_selecionada', 'frequencia_selecionada', 'severidade_selecionada',
-            'estacao_selecionada', 'ocorrencia_selecionada', 'initial_data_selection'
+            'ocorrencia_selecionada', 'initial_data_selection', 'station_filter_initialized'
         ]:
             keys_to_delete.append(key)
     for key in keys_to_delete:
@@ -316,43 +293,31 @@ def clear_filters():
     st.session_state.reset_key += 1
     st.rerun()
 
-df = df_original.copy()
-if not df.empty:
-    datas_selecionadas_list = [data for data, checked in st.session_state.items() if data.startswith('date_') and checked]
-    any_date_options = any(key.startswith('date_') for key in st.session_state)
-    
-    if any_date_options and not datas_selecionadas_list:
-        df = pd.DataFrame(columns=df.columns)
-    elif datas_selecionadas_list:
-        datas_para_filtrar = [pd.to_datetime(data.replace('date_', ''), errors='coerce') for data in datas_selecionadas_list]
-        df = df.loc[df['Data'].isin(datas_para_filtrar)]
-
-    estacoes_filtradas = st.session_state.get('estacao_selecionada', [])
-    if estacoes_filtradas:
-        df = df[df['Estação'].isin(estacoes_filtradas)]
-    if st.session_state.get('faixa_selecionada', 'Todas') != 'Todas': df = df[df['Faixa de Frequência Envolvida'] == st.session_state['faixa_selecionada']]
-    if st.session_state.get('frequencia_selecionada', 'Todas') != 'Todas': df = df[df['Frequência (MHz)'] == st.session_state['frequencia_selecionada']]
-    if st.session_state.get('severidade_selecionada', 'Todas') != 'Todas': df = df[df['Severidade?'] == st.session_state['severidade_selecionada']]
-    if st.session_state.get('ocorrencia_selecionada', 'Todas') != 'Todas':
-        map_status = {'Pendentes': 'Pendente', 'Concluídas': 'Concluído'}
-        df = df[df['Situação'] == map_status[st.session_state['ocorrencia_selecionada']]]
-
+# --- Bloco do Menu Lateral (Sidebar) ---
 with st.sidebar:
     st.toggle('Modo Dark', key='theme_toggle', value=(st.session_state.theme == 'Dark'), on_change=toggle_theme)
     st.title("Filtros")
+
+    estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e != 'Miaer'])
+
     if not df_original.empty:
         df_filtros = df_original.copy().dropna(subset=['Data'])
         
+        # Inicializa os filtros
         for key in ['faixa_selecionada', 'frequencia_selecionada', 'severidade_selecionada', 'ocorrencia_selecionada']:
             if key not in st.session_state: st.session_state[key] = 'Todas'
-        if 'estacao_selecionada' not in st.session_state:
-            st.session_state['estacao_selecionada'] = []
+        
+        if 'station_filter_initialized' not in st.session_state:
+            for station in estacoes_lista:
+                st.session_state[f'station_{station}'] = True
+            st.session_state['station_filter_initialized'] = True
         
         datas_disponiveis = sorted(df_filtros['Data'].dt.date.unique())
         if 'initial_data_selection' not in st.session_state:
             for data in datas_disponiveis: st.session_state[f"date_{data}"] = True
             st.session_state['initial_data_selection'] = True
 
+        # Widgets de filtro
         with st.expander("Dias do evento", expanded=False):
             if st.button("Selecionar todos", use_container_width=True, key=f"select_all_{st.session_state.reset_key}"):
                 for data in datas_disponiveis: st.session_state[f"date_{data}"] = True
@@ -364,31 +329,27 @@ with st.sidebar:
             for data in datas_disponiveis:
                 st.checkbox(data.strftime('%d/%m/%Y'), key=f"date_{data}")
         
+        with st.expander("Estação(ões)", expanded=False):
+            for station in estacoes_lista:
+                st.checkbox(station, key=f'station_{station}')
+
         faixas_lista = ['Todas'] + sorted(list(df_original['Faixa de Frequência Envolvida'].unique()))
-        st.session_state['faixa_selecionada'] = st.selectbox('Faixa de Frequência:', faixas_lista, key=f'faixa_select_{st.session_state.reset_key}', index=faixas_lista.index(st.session_state.get('faixa_selecionada', 'Todas')) if st.session_state.get('faixa_selecionada', 'Todas') in faixas_lista else 0)
-        
+        st.selectbox('Faixa de Frequência:', faixas_lista, key='faixa_selecionada')
+
         if 'Frequência (MHz)' in df_original.columns:
             unique_freqs = sorted(df_original['Frequência (MHz)'].dropna().unique().tolist())
             freq_options = ['Todas'] + unique_freqs
-            st.session_state['frequencia_selecionada'] = st.selectbox('Frequências (MHz):', freq_options, key=f'frequencia_select_{st.session_state.reset_key}', index=freq_options.index(st.session_state.get('frequencia_selecionada', 'Todas')) if st.session_state.get('frequencia_selecionada', 'Todas') in freq_options else 0)
+            st.selectbox('Frequências (MHz):', freq_options, key='frequencia_selecionada')
         
         unique_severidades = df_original['Severidade?'].dropna().unique()
         non_empty_severidades = [s for s in unique_severidades if str(s).strip()]
         severidades_lista = ['Todas'] + sorted(non_empty_severidades)
-        st.session_state['severidade_selecionada'] = st.selectbox('Severidade:', severidades_lista, key=f'severidade_select_{st.session_state.reset_key}', index=severidades_lista.index(st.session_state.get('severidade_selecionada', 'Todas')) if st.session_state.get('severidade_selecionada', 'Todas') in severidades_lista else 0)
+        st.selectbox('Severidade:', severidades_lista, key='severidade_selecionada')
     else:
         st.warning("Tabela de dados está vazia.")
 
-    estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e != 'Miaer'])
-    st.session_state['estacao_selecionada'] = st.multiselect(
-        'Estação(ões):', 
-        estacoes_lista, 
-        default=st.session_state['estacao_selecionada'],
-        key=f'estacao_multiselect_{st.session_state.reset_key}',
-        placeholder='Todas'
-    )
     opcoes_ocorrencia = ['Todas', 'Pendentes', 'Concluídas']
-    st.session_state['ocorrencia_selecionada'] = st.selectbox('Ocorrências:', opcoes_ocorrencia, key=f'ocorrencia_select_{st.session_state.reset_key}', index=opcoes_ocorrencia.index(st.session_state.get('ocorrencia_selecionada', 'Todas')) if st.session_state.get('ocorrencia_selecionada', 'Todas') in opcoes_ocorrencia else 0)
+    st.selectbox('Ocorrências:', opcoes_ocorrencia, key='ocorrencia_selecionada')
 
     st.markdown("---")
     normativos_links = {
@@ -422,66 +383,7 @@ with st.sidebar:
     if 'appanalise_bytes' not in st.session_state: st.session_state.appanalise_bytes = None
 
     placeholder_sidebar = st.empty()
-    if not st.session_state.confirm_export:
-        with placeholder_sidebar.container():
-            if st.button("Gerar arquivo para AppAnálise", use_container_width=True):
-                st.session_state.confirm_export = True
-                st.rerun()
     
-    if st.session_state.confirm_export:
-        with placeholder_sidebar.container():
-            st.warning("Confirma a seleção da(s) estação(ões) RFeye?")
-            confirm_col1, confirm_col2 = st.columns(2)
-            with confirm_col1:
-                st.markdown('<div class="confirm-yes-button">', unsafe_allow_html=True)
-                if st.button("Sim", use_container_width=True, key="confirm_yes"):
-                    with st.spinner("Gerando arquivo..."):
-                        source_cols = ['Frequência (MHz)', 'Largura (kHz)', 'Identificação', 'Processo SEI UTE']
-                        target_cols = {'Frequência (MHz)': 'Frequencia', 'Largura (kHz)': 'Largura', 'Identificação': 'Identificação', 'Processo SEI UTE': 'Processo SEI UTE'}
-                        cols_to_pull = [col for col in source_cols if col in df.columns]
-                        
-                        if not cols_to_pull:
-                            st.error("Nenhuma das colunas para o AppAnálise foi encontrada.")
-                            st.session_state.appanalise_bytes = None
-                        else:
-                            df_appanalise = df[cols_to_pull].rename(columns=target_cols)
-                            st.session_state.appanalise_bytes = to_excel(df_appanalise)
-                    
-                    st.session_state.confirm_export = False
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            with confirm_col2:
-                st.markdown('<div class="confirm-no-button">', unsafe_allow_html=True)
-                if st.button("Não", use_container_width=True, key="confirm_no"):
-                    st.session_state.confirm_export = False
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-
-    if st.session_state.appanalise_bytes:
-        st.download_button(
-            label="📥 Baixar Arquivo para AppAnálise",
-            data=st.session_state.appanalise_bytes,
-            file_name=f"emissoes_appanalise_{datetime.now().strftime('%Y%m%d')}.xlsx",
-            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            use_container_width=True
-        )
-        st.session_state.appanalise_bytes = None
-    
-    st.markdown("""
-    <div class="sidebar-info-box" style="margin-top: 0.5rem;">
-        <b>Equipe:</b><br>
-        Daniel Quintão - UO021<br>
-        Darlan Silva - GR09<br>
-        Halysson Barbosa - UO091<br>
-        Leandro Marques - GR02<br>
-        Marcelo Loschi - GR04<br>
-        Raffaello Bruno - UO062<br>
-        Thiago Alves - GR07<br>
-        Wilton Machado - GR08
-    </div>
-    """, unsafe_allow_html=True)
-
     st.markdown("---")
     st.markdown('<div class="sidebar-logo">', unsafe_allow_html=True)
     _, logo1_col, logo2_col, _ = st.columns([0.5, 1, 1, 0.5])
@@ -491,6 +393,96 @@ with st.sidebar:
         st.image("ods.png", width=106)
     st.markdown('</div>', unsafe_allow_html=True)
 
+
+# --- Bloco de Filtragem (MOVIMENTADO PARA A POSIÇÃO CORRETA) ---
+df = df_original.copy()
+if not df.empty:
+    if 'Situação' in df.columns:
+        df['Situação'] = df['Situação'].str.strip().str.capitalize()
+
+    datas_selecionadas_list = [data for data, checked in st.session_state.items() if data.startswith('date_') and checked]
+    any_date_options = any(key.startswith('date_') for key in st.session_state)
+    
+    if any_date_options and not datas_selecionadas_list:
+        df = pd.DataFrame(columns=df_original.columns)
+    elif datas_selecionadas_list:
+        datas_para_filtrar = [pd.to_datetime(data.replace('date_', ''), errors='coerce') for data in datas_selecionadas_list]
+        df = df.loc[df['Data'].isin(datas_para_filtrar)]
+
+    estacoes_selecionadas = [
+        station for station in estacoes_lista
+        if st.session_state.get(f'station_{station}', False)
+    ]
+    if any(st.session_state.get(f'station_{s}', False) for s in estacoes_lista):
+        df = df[df['Estação'].isin(estacoes_selecionadas)]
+    else:
+        df = pd.DataFrame(columns=df_original.columns)
+
+    if st.session_state.get('faixa_selecionada', 'Todas') != 'Todas': 
+        df = df[df['Faixa de Frequência Envolvida'] == st.session_state.faixa_selecionada]
+    if st.session_state.get('frequencia_selecionada', 'Todas') != 'Todas': 
+        df = df[df['Frequência (MHz)'] == st.session_state.frequencia_selecionada]
+    if st.session_state.get('severidade_selecionada', 'Todas') != 'Todas': 
+        df = df[df['Severidade?'] == st.session_state.severidade_selecionada]
+    if st.session_state.get('ocorrencia_selecionada', 'Todas') != 'Todas':
+        map_status = {'Pendentes': 'Pendente', 'Concluídas': 'Concluído'}
+        df = df[df['Situação'] == map_status[st.session_state.ocorrencia_selecionada]]
+
+
+# --- LÓGICA DE EXPORTAÇÃO (MOVIMENTADA PARA A POSIÇÃO CORRETA) ---
+if not st.session_state.confirm_export:
+    with placeholder_sidebar.container():
+        if st.button("Gerar arquivo para AppAnálise", use_container_width=True):
+            st.session_state.confirm_export = True
+            st.rerun()
+
+if st.session_state.confirm_export:
+    with placeholder_sidebar.container():
+        st.warning("Confirma a seleção da(s) estação(ões) RFeye?")
+        confirm_col1, confirm_col2 = st.columns(2)
+        with confirm_col1:
+            st.markdown('<div class="confirm-yes-button">', unsafe_allow_html=True)
+            if st.button("Sim", use_container_width=True, key="confirm_yes"):
+                with st.spinner("Gerando arquivo..."):
+                    df_export = df.copy()
+                    df_export['Processo SEI UTE'] = df_export['Processo SEI UTE'].fillna('').astype(str).str.strip()
+                    df_export['Identificação'] = df_export['Identificação'].fillna('').astype(str).str.strip()
+                    df_export['Descricao_formatada'] = df_export.apply(
+                        lambda row: f"{row['Identificação']} - Processo SEI UTE {row['Processo SEI UTE']}" if row['Processo SEI UTE'] != '' else row['Identificação'],
+                        axis=1
+                    )
+                    df_export['Frequência (MHz)'] = pd.to_numeric(df_export['Frequência (MHz)'], errors='coerce')
+                    df_export['Frequencia_formatada'] = df_export['Frequência (MHz)'].apply(
+                        lambda x: f'{x:.6f}'.replace('.', ',') if pd.notna(x) else ''
+                    )
+                    df_appanalise = pd.DataFrame({
+                        'Frequencia': df_export['Frequencia_formatada'],
+                        'Largura': df_export['Largura (kHz)'],
+                        'Descricao': df_export['Descricao_formatada']
+                    })
+                    st.session_state.appanalise_bytes = to_excel(df_appanalise)
+                st.session_state.confirm_export = False
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        with confirm_col2:
+            st.markdown('<div class="confirm-no-button">', unsafe_allow_html=True)
+            if st.button("Não", use_container_width=True, key="confirm_no"):
+                st.session_state.confirm_export = False
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+if st.session_state.appanalise_bytes:
+    with placeholder_sidebar.container():
+        st.download_button(
+            label="📥 Baixar Arquivo para AppAnálise",
+            data=st.session_state.appanalise_bytes,
+            file_name=f"emissoes_appanalise_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            use_container_width=True
+        )
+        st.session_state.appanalise_bytes = None
+
+# --- Conteúdo da Página Principal ---
 header_cols = st.columns([0.1, 0.8, 0.1])
 with header_cols[0]: st.image("logo.png", width=135)
 with header_cols[1]:
@@ -587,7 +579,8 @@ if not df.empty:
             all_estacoes_info = pd.concat([estacoes_info, miaer_info], ignore_index=True)
             center_lat, center_lon = all_estacoes_info['lat'].mean(), all_estacoes_info['lon'].mean()
 
-            estacoes_filtradas_mapa = st.session_state.get('estacao_selecionada', [])
+            estacoes_filtradas_mapa = [s for s in estacoes_lista if st.session_state.get(f'station_{s}')]
+            
             default_color = "#1A311F"
             selected_color = "#14337b"
 
