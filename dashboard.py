@@ -18,10 +18,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- ATUALIZAÇÃO AUTOMÁTICA ---
-#components.html("<meta http-equiv='refresh' content='300'>", height=0)
-
-
 # --- 1. GERENCIAMENTO DE TEMA E ESTILOS (CSS) ---
 BASE_PALETTE = ["#1A311F", "#14337b", "#80B525", "#8D877D", "#DF1B1D", "#DBDAC9"]
 VARIANT_PALETTE = ["#4A6D55", "#4464A7", "#608A1B", "#BDBAB3", "#E85C5D", "#B3B2A5"]
@@ -37,7 +33,6 @@ if 'theme' not in st.session_state:
     st.session_state.theme = 'Light'
 
 def get_theme_css(theme):
-    # ... (código de CSS permanece o mesmo)
     border_color = "#1A311F"
     
     report_button_css = """
@@ -217,54 +212,62 @@ def carregar_dados():
         creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
         client = gspread.authorize(creds)
         planilha = client.open("MONITORAÇÃO - COP30")
-        aba_painel = planilha.worksheet("PAINEL")
         
+        aba_painel = planilha.worksheet("PAINEL")
         intervalo_tabela = 'A1:AL'
         dados_lista = aba_painel.get(intervalo_tabela)
         headers = dados_lista.pop(0)
         df_return = pd.DataFrame(dados_lista, columns=headers)
 
         total_pendentes = 0
-        bsr_jammers_count = 0
-        erbs_fake_count = 0
         if not df_return.empty:
             df_return = df_return[df_return['Faixa de Frequência Envolvida'].astype(str).str.strip() != '']
             df_return['Data'] = pd.to_datetime(df_return['Data'], errors='coerce', dayfirst=True)
             if 'Detalhes da Ocorrência' in df_return.columns: df_return['Detalhes da Ocorrência'].replace('', '-', inplace=True)
             else: df_return['Detalhes da Ocorrência'] = '-'
             if 'Situação' in df_return.columns: total_pendentes = (df_return['Situação'] == 'Pendente').sum()
+
+        # --- INÍCIO DO BLOCO CORRIGIDO ---
         
         fiscais_datas_str = aba_painel.get('W1:AL1')[0]
         fiscais_valores = aba_painel.get('W2:AL2')[0]
         
-        fiscais_por_dia = {}
+        # Pega a data de hoje usando o fuso horário de São Paulo para garantir a correção
+        hoje_brasil = datetime.now(pytz.timezone('America/Sao_Paulo'))
+        hoje_completo_str = hoje_brasil.strftime('%d/%m/%Y')
+        hoje_curto_str = hoje_brasil.strftime('%d/%m')
+        
+        # Define os valores padrão
+        fiscais_hoje = "0"
+        titulo_data = "Fora do período"
+
+        # Itera sobre as datas da planilha para encontrar uma correspondência
         if len(fiscais_datas_str) == len(fiscais_valores):
             for i, data_str in enumerate(fiscais_datas_str):
-                try:
-                    data_normalizada = pd.to_datetime(data_str, dayfirst=True).strftime('%d/%m/%Y')
-                    fiscais_por_dia[data_normalizada] = fiscais_valores[i]
-                except (ValueError, TypeError): continue
-        
+                # Compara a data da planilha (limpando espaços extras) com a data de hoje
+                if str(data_str).strip() == hoje_completo_str:
+                    fiscais_hoje = fiscais_valores[i]
+                    titulo_data = hoje_curto_str
+                    break # Para o loop assim que encontrar a data de hoje
+
+        # --- FIM DO BLOCO CORRIGIDO ---
+
+        bsr_jammers_count = 0
+        erbs_fake_count = 0
         try:
             bsr_fake_cells = aba_painel.get('U2:V2')[0]
-            bsr_jammers_count = int(bsr_fake_cells[0]) if bsr_fake_cells[0].isdigit() else 0
-            erbs_fake_count = int(bsr_fake_cells[1]) if bsr_fake_cells[1].isdigit() else 0
+            bsr_jammers_count = int(bsr_fake_cells[0]) if bsr_fake_cells and bsr_fake_cells[0].isdigit() else 0
+            erbs_fake_count = int(bsr_fake_cells[1]) if len(bsr_fake_cells) > 1 and bsr_fake_cells[1].isdigit() else 0
         except (IndexError, ValueError):
             bsr_jammers_count, erbs_fake_count = 0, 0
-        
-        hoje_completo_str = date.today().strftime('%d/%m/%Y')
-        hoje_curto_str = date.today().strftime('%d/%m')
-        
-        fiscais_hoje = fiscais_por_dia.get(hoje_completo_str, "0")
-        
-        titulo_data = hoje_curto_str if hoje_completo_str in fiscais_por_dia else "Fora do período"
             
         return df_return, datetime.now(pytz.timezone('America/Sao_Paulo')), titulo_data, fiscais_hoje, total_pendentes, bsr_jammers_count, erbs_fake_count
     except Exception as e:
         st.error(f"Erro ao carregar os dados: {e}")
         return pd.DataFrame(), None, "Erro", "0", 0, 0, 0
 
-# --- INÍCIO DA SEÇÃO CORRIGIDA E CENTRALIZADA ---
+# --- (O restante do código, incluindo a definição dos DataFrames das estações, sidebar, filtros e layout da página, permanece exatamente o mesmo) ---
+# ...
 estacoes_info = pd.DataFrame({
     'Estação': ['RFeye002129', 'RFeye002175', 'RFeye002315', 'RFeye002012', 'RFeye002303', 'RFeye002093'],
     'Nome': ['MANGUEIRINHO', 'ALDEIA', 'DOCAS', 'OUTEIRO', 'PARQUE da CIDADE', 'ANATEL'],
@@ -275,12 +278,9 @@ estacoes_info = pd.DataFrame({
 miaer_info = pd.DataFrame({'Estação': ['Miaer'], 'Nome': ['CENSIPAM'], 'lat': [-1.409319], 'lon': [-48.462516], 'size': 25})
 cellpl_info = pd.DataFrame({'Estação': ['CWSM211022'], 'Nome': ['UFPA'], 'lat': [-1.476756], 'lon': [-48.456606], 'size': 25})
 
-# Loop único para processar TODOS os dataframes de uma vez
 for df_info in [estacoes_info, miaer_info, cellpl_info]:
     df_info['NomeFormatado'] = df_info['Nome'].str.title()
     df_info['rotulo'] = df_info['Estação'] + ' - ' + df_info['NomeFormatado']
-# --- FIM DA SEÇÃO CORRIGIDA ---
-
 
 df_original, ultima_atualizacao, titulo_data, fiscais_hoje, total_pendentes_original, bsr_jammers_count, erbs_fake_count = carregar_dados()
 if df_original is None: st.warning("Não foi possível carregar os dados da planilha."); st.stop()
@@ -291,7 +291,8 @@ def clear_filters():
     for key in st.session_state.keys():
         if key.startswith(('date_', 'station_')) or key in [
             'faixa_selecionada', 'frequencia_selecionada', 'severidade_selecionada',
-            'ocorrencia_selecionada', 'initial_data_selection', 'station_filter_initialized'
+            'licenciamento_selecionado', 'ocorrencia_selecionada', 'initial_data_selection', 
+            'station_filter_initialized'
         ]:
             keys_to_delete.append(key)
     for key in keys_to_delete:
@@ -299,19 +300,16 @@ def clear_filters():
     st.session_state.reset_key += 1
     st.rerun()
 
-# --- Bloco do Menu Lateral (Sidebar) ---
 with st.sidebar:
     st.toggle('Modo Dark', key='theme_toggle', value=(st.session_state.theme == 'Dark'), on_change=toggle_theme)
     st.title("Filtros")
     
-    # Lista de estações para os filtros (excluindo as fixas)
     estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e not in ['Miaer', 'CWSM211022']])
 
     if not df_original.empty:
         df_filtros = df_original.copy().dropna(subset=['Data'])
         
-        # Inicializa os filtros
-        for key in ['faixa_selecionada', 'frequencia_selecionada', 'severidade_selecionada', 'ocorrencia_selecionada']:
+        for key in ['faixa_selecionada', 'frequencia_selecionada', 'severidade_selecionada', 'licenciamento_selecionado', 'ocorrencia_selecionada']:
             if key not in st.session_state: st.session_state[key] = 'Todas'
         
         if 'station_filter_initialized' not in st.session_state:
@@ -324,7 +322,6 @@ with st.sidebar:
             for data in datas_disponiveis: st.session_state[f"date_{data}"] = True
             st.session_state['initial_data_selection'] = True
 
-        # Widgets de filtro
         with st.expander("Dias do evento", expanded=False):
             if st.button("Selecionar todos", use_container_width=True, key=f"select_all_{st.session_state.reset_key}"):
                 for data in datas_disponiveis: st.session_state[f"date_{data}"] = True
@@ -352,6 +349,10 @@ with st.sidebar:
         non_empty_severidades = [s for s in unique_severidades if str(s).strip()]
         severidades_lista = ['Todas'] + sorted(non_empty_severidades)
         st.selectbox('Severidade:', severidades_lista, key='severidade_selecionada')
+
+        opcoes_licenciamento = ['Todas', 'Licenciado', 'Não licenciado', 'Não licenciável']
+        st.selectbox('Licenciamento:', opcoes_licenciamento, key='licenciamento_selecionado')
+        
     else:
         st.warning("Tabela de dados está vazia.")
 
@@ -367,30 +368,23 @@ with st.sidebar:
         "Regulamento sobre BSRs": "https://informacoes.anatel.gov.br/legislacao/resolucoes/2023/1842-resolucao-760",
         "PDFF 2025": "https://informacoes.anatel.gov.br/legislacao/resolucoes/2025/2001-resolucao-772"
     }
-    
     selected_normativo = st.selectbox(
         'Consulta de normativos',
         list(normativos_links.keys()),
         index=0
     )
-
     if selected_normativo and normativos_links[selected_normativo]:
         st.markdown(f"**Acessar:** [{selected_normativo}]({normativos_links[selected_normativo]})")
     st.markdown("---")
-    
     if st.button("Limpar Filtros", use_container_width=True, key='clear_filters_button'): clear_filters()
     st.markdown("---")
     if st.button("Atualizar Painel", use_container_width=True):
         st.cache_data.clear(); st.rerun()
     if ultima_atualizacao: st.caption(f"Última atualização: {ultima_atualizacao.strftime('%d/%m/%Y às %H:%M')}")
-
     st.markdown("---")
-
     if 'confirm_export' not in st.session_state: st.session_state.confirm_export = False
     if 'appanalise_bytes' not in st.session_state: st.session_state.appanalise_bytes = None
-
     placeholder_sidebar = st.empty()
-    
     st.markdown("---")
     st.markdown('<div class="sidebar-logo">', unsafe_allow_html=True)
     _, logo1_col, logo2_col, _ = st.columns([0.5, 1, 1, 0.5])
@@ -400,22 +394,17 @@ with st.sidebar:
         st.image("ods.png", width=106)
     st.markdown('</div>', unsafe_allow_html=True)
 
-
-# --- Bloco de Filtragem ---
 df = df_original.copy()
 if not df.empty:
     if 'Situação' in df.columns:
         df['Situação'] = df['Situação'].str.strip().str.capitalize()
-
     datas_selecionadas_list = [data for data, checked in st.session_state.items() if data.startswith('date_') and checked]
     any_date_options = any(key.startswith('date_') for key in st.session_state)
-    
     if any_date_options and not datas_selecionadas_list:
         df = pd.DataFrame(columns=df_original.columns)
     elif datas_selecionadas_list:
         datas_para_filtrar = [pd.to_datetime(data.replace('date_', ''), errors='coerce') for data in datas_selecionadas_list]
         df = df.loc[df['Data'].isin(datas_para_filtrar)]
-
     estacoes_selecionadas = [
         station for station in estacoes_lista
         if st.session_state.get(f'station_{station}', False)
@@ -424,25 +413,27 @@ if not df.empty:
         df = df[df['Estação'].isin(estacoes_selecionadas)]
     else:
         df = pd.DataFrame(columns=df_original.columns)
-
     if st.session_state.get('faixa_selecionada', 'Todas') != 'Todas': 
         df = df[df['Faixa de Frequência Envolvida'] == st.session_state.faixa_selecionada]
     if st.session_state.get('frequencia_selecionada', 'Todas') != 'Todas': 
         df = df[df['Frequência (MHz)'] == st.session_state.frequencia_selecionada]
     if st.session_state.get('severidade_selecionada', 'Todas') != 'Todas': 
         df = df[df['Severidade?'] == st.session_state.severidade_selecionada]
+    if st.session_state.get('licenciamento_selecionado', 'Todas') != 'Todas':
+        selecao = st.session_state.licenciamento_selecionado
+        if selecao == 'Não licenciado':
+            df = df[df['Autorizado?'].astype(str).str.strip().str.upper() == 'NÃO']
+        else:
+            df = df[df['Autorizado?'].astype(str).str.strip() == selecao]
     if st.session_state.get('ocorrencia_selecionada', 'Todas') != 'Todas':
         map_status = {'Pendentes': 'Pendente', 'Concluídas': 'Concluído'}
         df = df[df['Situação'] == map_status[st.session_state.ocorrencia_selecionada]]
 
-
-# --- LÓGICA DE EXPORTAÇÃO ---
 if not st.session_state.confirm_export:
     with placeholder_sidebar.container():
         if st.button("Gerar arquivo para AppAnálise", use_container_width=True):
             st.session_state.confirm_export = True
             st.rerun()
-
 if st.session_state.confirm_export:
     with placeholder_sidebar.container():
         st.warning("Confirma a seleção da(s) estação(ões) RFeye?")
@@ -477,7 +468,6 @@ if st.session_state.confirm_export:
                 st.session_state.confirm_export = False
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
-
 if st.session_state.appanalise_bytes:
     with placeholder_sidebar.container():
         st.download_button(
@@ -489,7 +479,6 @@ if st.session_state.appanalise_bytes:
         )
         st.session_state.appanalise_bytes = None
 
-# --- Conteúdo da Página Principal ---
 header_cols = st.columns([0.1, 0.8, 0.1])
 with header_cols[0]: st.image("logo.png", width=135)
 with header_cols[1]:
@@ -503,24 +492,29 @@ with header_cols[1]:
 with header_cols[2]: st.image("anatel.png", width=105)
 st.markdown("---")
 
-if df.empty:
+if df.empty and not df_original.empty:
     st.info("Nenhum dado encontrado para a seleção atual. Por favor, ajuste os filtros na barra lateral.")
     st.stop()
+elif df_original.empty:
+    st.info("Nenhum dado carregado da planilha.")
+    st.stop()
     
-ute_count = 0
-if 'UTE?' in df_original.columns:
-    ute_count = (df_original['UTE?'].astype(str).str.strip().str.lower() == 'true').sum()
-else:
-    st.sidebar.warning("Coluna 'UTE?' (coluna K) não encontrada na planilha.")
+ute_count_filtrado = 0
+if 'UTE?' in df.columns:
+    ute_count_filtrado = (df['UTE?'].astype(str).str.strip().str.lower() == 'true').sum()
+
+nao_licenciadas_filtrado = 0
+if 'Autorizado?' in df.columns:
+    nao_licenciadas_filtrado = (df['Autorizado?'].astype(str).str.strip().str.upper() == 'NÃO').sum()
 
 kpi_cols = st.columns(6, gap="small")
 kpi_data = [
     {"label": "Emissões verificadas", "value": len(df), "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Total de emissões detectadas e analisadas dentro do período e filtros selecionados."},
-    {"label": "Emissões UTE", "value": ute_count, "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Contagem de emissões classificadas como UTE em todo o período."},
-    {"label": "Não Licenciadas", "value": len(df[df['Autorizado?'] == 'FALSE']), "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Contagem de emissões não autorizadas dentro dos filtros selecionados."},
+    {"label": "Emissões UTE", "value": ute_count_filtrado, "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Contagem de emissões UTE dentro dos filtros selecionados."},
+    {"label": "Não Licenciadas", "value": nao_licenciadas_filtrado, "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Contagem de emissões não autorizadas dentro dos filtros selecionados."},
     {"label": "Verificações Pendentes", "value": total_pendentes_original, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Total de emissões com situação 'Pendente' em todo o período (não afetado por filtros)."},
-    {"label": "BSRs (Jammers)", "value": bsr_jammers_count, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Contagem de BSRs ou Jammers detectados."},
-    {"label": "ERBs Fake", "value": erbs_fake_count, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Contagem de ERBs Falsas detectadas."}
+    {"label": "BSRs (Jammers)", "value": int(bsr_jammers_count), "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Contagem total de BSRs/Jammers identificados."},
+    {"label": "ERBs Fake", "value": int(erbs_fake_count), "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Contagem total de ERBs Fake identificadas."}
 ]
 for i, data in enumerate(kpi_data):
     with kpi_cols[i]:
@@ -577,29 +571,19 @@ if not df.empty:
                     st.plotly_chart(fig_chart, use_container_width=True)
                 else: st.info("Não há dados de 'Identificação' para a seleção atual.")
             else: st.warning("Coluna 'Identificação' não encontrada. Verifique o nome da Coluna I na planilha.")
-
     bottom_cols = st.columns([0.45, 0.55], gap="small")
     with bottom_cols[0]:
         with st.container():
             st.markdown('<div class="style-marker"></div>', unsafe_allow_html=True)
             st.subheader("Mapa das Estações")
-            
-            # --- INÍCIO DA LINHA CORRIGIDA ---
             all_estacoes_info = pd.concat([estacoes_info, miaer_info, cellpl_info], ignore_index=True)
-            # --- FIM DA LINHA CORRIGIDA ---
-            
             center_lat, center_lon = all_estacoes_info['lat'].mean(), all_estacoes_info['lon'].mean()
-
             estacoes_filtradas_mapa = [s for s in estacoes_lista if st.session_state.get(f'station_{s}')]
-            
             default_color = "#1A311F"
             selected_color = "#14337b"
-
             all_estacoes_info['map_color'] = default_color
-            
             if estacoes_filtradas_mapa:
                 all_estacoes_info.loc[all_estacoes_info['Estação'].isin(estacoes_filtradas_mapa), 'map_color'] = selected_color
-            
             fig_mapa = px.scatter_mapbox(
                 all_estacoes_info, 
                 lat="lat", 
@@ -613,7 +597,6 @@ if not df.empty:
                 color_discrete_map="identity"
             )
             fig_mapa.update_traces(marker=dict(size=13), textfont_color='#1A311F', textposition='middle right')
-            
             fig_mapa.update_layout(mapbox_style="carto-positron", mapbox_center={"lat": center_lat, "lon": center_lon}, margin={"r":0, "t":0, "l":0, "b":0}, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                                     uniformtext=dict(minsize=6, mode='show'),
                                     mapbox_layers=[
@@ -621,7 +604,6 @@ if not df.empty:
                                         {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.45959464675182,-1.413824160742325], [-48.46115955268121,-1.41541976951611], [-48.45902894923615,-1.417522902260756], [-48.45638287288467,-1.420317822531534], [-48.45765406178806,-1.422206297114926], [-48.45764136955441,-1.422452385058413], [-48.45687501383681,-1.423154480079293], [-48.45559653463967,-1.422811508724929], [-48.454740001063,-1.42206627992075], [-48.4541426707238,-1.421661972091132], [-48.45383496756163,-1.419824290338865], [-48.45959464675182,-1.413824160742325]]]}}]}'), "type": "fill", "color": "rgba(0, 0, 255, 0.5)"}
                                     ])
             st.plotly_chart(fig_mapa, use_container_width=True)
-            
     with bottom_cols[1]:
         with st.container():
             st.markdown('<div class="style-marker"></div>', unsafe_allow_html=True)
@@ -650,9 +632,7 @@ if not df.empty:
                 )
                 st.plotly_chart(fig_estacao_dia, use_container_width=True)
             else: st.info("Nenhuma emissão com data válida na seleção.")
-    
     st.markdown('<div class="page-break-before"></div>', unsafe_allow_html=True)
-    
     with st.container():
         st.markdown('<div class="table-container-style"></div>', unsafe_allow_html=True)
         colunas_para_exibir = {'Data': 'Data', 'Nome': 'Região', 'Estação': 'Estação','Frequência (MHz)': 'Frequência (MHz)', 'Largura (kHz)': 'Largura (kHz)', 'Faixa de Frequência Envolvida': 'Faixa de Frequência','Autorizado?': 'Autorizado?', 'Severidade?': 'Severidade', 'Detalhes da Ocorrência': 'Detalhes','Fiscal': 'Fiscal','Situação': 'Situação'}
@@ -663,7 +643,6 @@ if not df.empty:
         if 'Largura (kHz)' not in colunas_existentes and 'largura_warning' not in st.session_state:
             st.session_state.largura_warning = True
             st.sidebar.warning("A coluna 'Largura (kHz)' (coluna G) não foi encontrada. Verifique o nome do cabeçalho.")
-            
         df_tabela = df_com_nomes[colunas_existentes].rename(columns=colunas_para_exibir)
         if 'Data' in df_tabela.columns:
             df_tabela['Data'] = pd.to_datetime(df_tabela['Data'], errors='coerce')
@@ -687,6 +666,5 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
-        
 else:
     st.warning("Nenhum dado encontrado para a seleção atual.")
