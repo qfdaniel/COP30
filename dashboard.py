@@ -205,7 +205,7 @@ def to_excel(df: pd.DataFrame):
         df.to_excel(writer, index=False, sheet_name='Dados')
     return output.getvalue()
 
-@st.cache_data(ttl=300, show_spinner="Buscando novos dados da planilha...")
+@st.cache_data(ttl=30, show_spinner="Buscando novos dados da planilha...")
 def carregar_dados():
     try:
         scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
