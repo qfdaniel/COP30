@@ -260,11 +260,25 @@ def carregar_dados():
             erbs_fake_count = int(bsr_fake_cells[1]) if len(bsr_fake_cells) > 1 and bsr_fake_cells[1].isdigit() else 0
         except (IndexError, ValueError):
             bsr_jammers_count, erbs_fake_count = 0, 0
+        
+        # --- NOVO CÁLCULO DE INTERFERÊNCIAS ---
+        interferencias_registradas = 0
+        try:
+            aba_abordagem = planilha.worksheet("Abordagem")
+            # Coluna O é a 15ª coluna
+            valores_o_painel = aba_painel.col_values(15)
+            valores_o_abordagem = aba_abordagem.col_values(15)
             
-        return df_return, datetime.now(pytz.timezone('America/Sao_Paulo')), titulo_data, fiscais_hoje, total_pendentes, bsr_jammers_count, erbs_fake_count
+            count_painel = valores_o_painel.count('Sim')
+            count_abordagem = valores_o_abordagem.count('Sim')
+            interferencias_registradas = count_painel + count_abordagem
+        except Exception:
+            interferencias_registradas = 0 
+            
+        return df_return, datetime.now(pytz.timezone('America/Sao_Paulo')), titulo_data, fiscais_hoje, total_pendentes, bsr_jammers_count, erbs_fake_count, interferencias_registradas
     except Exception as e:
         st.error(f"Erro ao carregar os dados: {e}")
-        return pd.DataFrame(), None, "Erro", "0", 0, 0, 0
+        return pd.DataFrame(), None, "Erro", "0", 0, 0, 0, 0
 
 # --- (O restante do código, incluindo a definição dos DataFrames das estações, sidebar, filtros e layout da página, permanece exatamente o mesmo) ---
 # ...
@@ -282,7 +296,7 @@ for df_info in [estacoes_info, miaer_info, cellpl_info]:
     df_info['NomeFormatado'] = df_info['Nome'].str.title()
     df_info['rotulo'] = df_info['Estação'] + ' - ' + df_info['NomeFormatado']
 
-df_original, ultima_atualizacao, titulo_data, fiscais_hoje, total_pendentes_original, bsr_jammers_count, erbs_fake_count = carregar_dados()
+df_original, ultima_atualizacao, titulo_data, fiscais_hoje, total_pendentes_original, bsr_jammers_count, erbs_fake_count, interferencias_registradas = carregar_dados()
 if df_original is None: st.warning("Não foi possível carregar os dados da planilha."); st.stop()
 if 'reset_key' not in st.session_state: st.session_state.reset_key = 0
 
@@ -290,7 +304,7 @@ def clear_filters():
     keys_to_delete = []
     for key in st.session_state.keys():
         if key.startswith(('date_', 'station_')) or key in [
-            'faixa_selecionada', 'frequencia_selecionada', 'severidade_selecionada',
+            'faixa_selecionada', 'frequencia_selecionada', 'interferente_selecionado',
             'licenciamento_selecionado', 'ocorrencia_selecionada', 'initial_data_selection', 
             'station_filter_initialized'
         ]:
@@ -309,7 +323,7 @@ with st.sidebar:
     if not df_original.empty:
         df_filtros = df_original.copy().dropna(subset=['Data'])
         
-        for key in ['faixa_selecionada', 'frequencia_selecionada', 'severidade_selecionada', 'licenciamento_selecionado', 'ocorrencia_selecionada']:
+        for key in ['faixa_selecionada', 'frequencia_selecionada', 'interferente_selecionado', 'licenciamento_selecionado', 'ocorrencia_selecionada']:
             if key not in st.session_state: st.session_state[key] = 'Todas'
         
         if 'station_filter_initialized' not in st.session_state:
@@ -345,10 +359,8 @@ with st.sidebar:
             freq_options = ['Todas'] + unique_freqs
             st.selectbox('Frequências (MHz):', freq_options, key='frequencia_selecionada')
         
-        unique_severidades = df_original['Severidade?'].dropna().unique()
-        non_empty_severidades = [s for s in unique_severidades if str(s).strip()]
-        severidades_lista = ['Todas'] + sorted(non_empty_severidades)
-        st.selectbox('Severidade:', severidades_lista, key='severidade_selecionada')
+        opcoes_interferente = ['Todas', 'Sim', 'Não', 'Indefinido']
+        st.selectbox('Interferente?:', opcoes_interferente, key='interferente_selecionado')
 
         opcoes_licenciamento = ['Todas', 'Licenciado', 'Não licenciado', 'Não licenciável']
         st.selectbox('Licenciamento:', opcoes_licenciamento, key='licenciamento_selecionado')
@@ -417,8 +429,8 @@ if not df.empty:
         df = df[df['Faixa de Frequência Envolvida'] == st.session_state.faixa_selecionada]
     if st.session_state.get('frequencia_selecionada', 'Todas') != 'Todas': 
         df = df[df['Frequência (MHz)'] == st.session_state.frequencia_selecionada]
-    if st.session_state.get('severidade_selecionada', 'Todas') != 'Todas': 
-        df = df[df['Severidade?'] == st.session_state.severidade_selecionada]
+    if st.session_state.get('interferente_selecionado', 'Todas') != 'Todas': 
+        df = df[df['Interferente?'] == st.session_state.interferente_selecionado]
     if st.session_state.get('licenciamento_selecionado', 'Todas') != 'Todas':
         selecao = st.session_state.licenciamento_selecionado
         if selecao == 'Não licenciado':
@@ -499,10 +511,6 @@ elif df_original.empty:
     st.info("Nenhum dado carregado da planilha.")
     st.stop()
     
-ute_count_filtrado = 0
-if 'UTE?' in df.columns:
-    ute_count_filtrado = (df['UTE?'].astype(str).str.strip().str.lower() == 'true').sum()
-
 nao_licenciadas_filtrado = 0
 if 'Autorizado?' in df.columns:
     nao_licenciadas_filtrado = (df['Autorizado?'].astype(str).str.strip().str.upper() == 'NÃO').sum()
@@ -510,9 +518,9 @@ if 'Autorizado?' in df.columns:
 kpi_cols = st.columns(6, gap="small")
 kpi_data = [
     {"label": "Emissões verificadas", "value": len(df), "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Total de emissões detectadas e analisadas dentro do período e filtros selecionados."},
-    {"label": "Emissões UTE", "value": ute_count_filtrado, "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Contagem de emissões UTE dentro dos filtros selecionados."},
     {"label": "Não Licenciadas", "value": nao_licenciadas_filtrado, "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Contagem de emissões não autorizadas dentro dos filtros selecionados."},
     {"label": "Verificações Pendentes", "value": total_pendentes_original, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Total de emissões com situação 'Pendente' em todo o período (não afetado por filtros)."},
+    {"label": "Interferências", "value": interferencias_registradas, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Soma de todas as células 'Sim' da Aba Abordagem (coluna O) + 'Sim' da Aba Painel (coluna O)."},
     {"label": "BSRs (Jammers)", "value": int(bsr_jammers_count), "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Contagem total de BSRs/Jammers identificados."},
     {"label": "ERBs Fake", "value": int(erbs_fake_count), "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Contagem total de ERBs Fake identificadas."}
 ]
@@ -528,7 +536,7 @@ for i, data in enumerate(kpi_data):
             <div class="kpi-value">{data['value']}</div>
         </div>
         """, unsafe_allow_html=True)
-    
+        
 st.markdown('<div style="margin-top: 2.5rem;"></div>', unsafe_allow_html=True)
 
 if not df.empty:
@@ -635,7 +643,7 @@ if not df.empty:
     st.markdown('<div class="page-break-before"></div>', unsafe_allow_html=True)
     with st.container():
         st.markdown('<div class="table-container-style"></div>', unsafe_allow_html=True)
-        colunas_para_exibir = {'Data': 'Data', 'Nome': 'Região', 'Estação': 'Estação','Frequência (MHz)': 'Frequência (MHz)', 'Largura (kHz)': 'Largura (kHz)', 'Faixa de Frequência Envolvida': 'Faixa de Frequência','Autorizado?': 'Autorizado?', 'Severidade?': 'Severidade', 'Detalhes da Ocorrência': 'Detalhes','Fiscal': 'Fiscal','Situação': 'Situação'}
+        colunas_para_exibir = {'Data': 'Data', 'Nome': 'Região', 'Estação': 'Estação','Frequência (MHz)': 'Frequência (MHz)', 'Largura (kHz)': 'Largura (kHz)', 'Faixa de Frequência Envolvida': 'Faixa de Frequência','Autorizado?': 'Autorizado?', 'Interferente?': 'Interferente?', 'Detalhes da Ocorrência': 'Detalhes','Fiscal': 'Fiscal','Situação': 'Situação'}
         colunas_existentes = [col for col in colunas_para_exibir.keys() if col in df_com_nomes.columns]
         if 'Fiscal' not in colunas_existentes and 'fiscal_warning' not in st.session_state:
             st.session_state.fiscal_warning = True
