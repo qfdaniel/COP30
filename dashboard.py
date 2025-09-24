@@ -132,7 +132,7 @@ def get_full_css(theme):
         [data-testid="stSidebar"] .stCaptionContainer + .sidebar-info-box {{
             margin-top: -0.5rem !important;
         }}
-        .ag-header-cell-label {{ justify-content: center; font-weight: bold; }}
+        .ag-header-cell-label {{ justify-content: center; text-align: center; font-weight: bold; }}
         .confirm-yes-button .stButton > button {{
             background-color: #4CAF50 !important; color: white !important; border: 1px solid #388E3C !important;
         }}
@@ -155,7 +155,7 @@ def get_full_css(theme):
                 border: 2px solid {border_color}; border-radius: 15px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
             }}
             .stApp {{ background-color: #1E1E1E; }} 
-            h1, h3, .title-subtitle span {{ color: #DBDAC9 !important; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); }}
+            h1, h3, .title-subtitle {{ color: #DBDAC9 !important; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); }}
             h2 {{ color: #FFFFFF; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); }}
             button[aria-label="Open sidebar"] svg, button[aria-label="Close sidebar"] svg {{
                 fill: #DBDAC9 !important;
@@ -309,7 +309,7 @@ def clear_filters():
         if key.startswith(('date_', 'station_')) or key in [
             'faixa_selecionada', 'frequencia_selecionada', 'interferente_selecionado',
             'licenciamento_selecionado', 'ocorrencia_selecionada', 'initial_data_selection', 
-            'station_filter_initialized'
+            'station_filter_initialized', 'ute_selecionado'
         ]:
             keys_to_delete.append(key)
     for key in keys_to_delete:
@@ -326,7 +326,7 @@ with st.sidebar:
     if not df_original.empty:
         df_filtros = df_original.copy().dropna(subset=['Data'])
         
-        for key in ['faixa_selecionada', 'frequencia_selecionada', 'interferente_selecionado', 'licenciamento_selecionado', 'ocorrencia_selecionada']:
+        for key in ['faixa_selecionada', 'frequencia_selecionada', 'interferente_selecionado', 'licenciamento_selecionado', 'ocorrencia_selecionada', 'ute_selecionado']:
             if key not in st.session_state: st.session_state[key] = 'Todas'
         
         if 'station_filter_initialized' not in st.session_state:
@@ -373,6 +373,9 @@ with st.sidebar:
 
     opcoes_ocorrencia = ['Todas', 'Pendentes', 'Concluídas']
     st.selectbox('Ocorrências:', opcoes_ocorrencia, key='ocorrencia_selecionada')
+    
+    opcoes_ute = ['Todas', 'Sim', 'Não']
+    st.selectbox('Emissões UTE:', opcoes_ute, key='ute_selecionado')
 
     st.markdown("---")
     normativos_links = {
@@ -411,8 +414,16 @@ with st.sidebar:
 
 df = df_original.copy()
 if not df.empty:
+    # Adiciona a coluna 'UTE?' baseada na coluna K (índice 10)
+    if len(df.columns) > 10:
+        coluna_k_nome = df.columns[10]
+        df['UTE?'] = df[coluna_k_nome].apply(lambda x: 'Sim' if str(x).strip().upper() in ['TRUE', 'SIM'] else 'Não')
+    else:
+        df['UTE?'] = 'Não'
+
     if 'Situação' in df.columns:
         df['Situação'] = df['Situação'].str.strip().str.capitalize()
+
     datas_selecionadas_list = [data for data, checked in st.session_state.items() if data.startswith('date_') and checked]
     any_date_options = any(key.startswith('date_') for key in st.session_state)
     if any_date_options and not datas_selecionadas_list:
@@ -420,29 +431,36 @@ if not df.empty:
     elif datas_selecionadas_list:
         datas_para_filtrar = [pd.to_datetime(data.replace('date_', ''), errors='coerce') for data in datas_selecionadas_list]
         df = df.loc[df['Data'].isin(datas_para_filtrar)]
-    estacoes_selecionadas = [
-        station for station in estacoes_lista
-        if st.session_state.get(f'station_{station}', False)
-    ]
+    
+    estacoes_selecionadas = [station for station in estacoes_lista if st.session_state.get(f'station_{station}', False)]
     if any(st.session_state.get(f'station_{s}', False) for s in estacoes_lista):
         df = df[df['Estação'].isin(estacoes_selecionadas)]
     else:
         df = pd.DataFrame(columns=df_original.columns)
+    
     if st.session_state.get('faixa_selecionada', 'Todas') != 'Todas': 
         df = df[df['Faixa de Frequência Envolvida'] == st.session_state.faixa_selecionada]
+    
     if st.session_state.get('frequencia_selecionada', 'Todas') != 'Todas': 
         df = df[df['Frequência (MHz)'] == st.session_state.frequencia_selecionada]
+    
     if st.session_state.get('interferente_selecionado', 'Todas') != 'Todas': 
         df = df[df['Interferente?'] == st.session_state.interferente_selecionado]
+    
     if st.session_state.get('licenciamento_selecionado', 'Todas') != 'Todas':
         selecao = st.session_state.licenciamento_selecionado
         if selecao == 'Não licenciado':
             df = df[df['Autorizado?'].astype(str).str.strip().str.upper() == 'NÃO']
         else:
             df = df[df['Autorizado?'].astype(str).str.strip() == selecao]
+            
     if st.session_state.get('ocorrencia_selecionada', 'Todas') != 'Todas':
         map_status = {'Pendentes': 'Pendente', 'Concluídas': 'Concluído'}
         df = df[df['Situação'] == map_status[st.session_state.ocorrencia_selecionada]]
+
+    if st.session_state.get('ute_selecionado', 'Todas') != 'Todas':
+        df = df[df['UTE?'] == st.session_state.ute_selecionado]
+
 
 if not st.session_state.confirm_export:
     with placeholder_sidebar.container():
@@ -644,7 +662,13 @@ if not df.empty:
     st.markdown('<div class="page-break-before"></div>', unsafe_allow_html=True)
     with st.container():
         st.markdown('<div class="table-container-style"></div>', unsafe_allow_html=True)
-        colunas_para_exibir = {'Data': 'Data', 'Nome': 'Região', 'Estação': 'Estação','Frequência (MHz)': 'Frequência (MHz)', 'Largura (kHz)': 'Largura (kHz)', 'Faixa de Frequência Envolvida': 'Faixa de Frequência','Autorizado?': 'Autorizado?', 'Interferente?': 'Interferente?', 'Detalhes da Ocorrência': 'Detalhes','Fiscal': 'Fiscal','Situação': 'Situação'}
+        colunas_para_exibir = {
+            'Data': 'Data', 'Nome': 'Região', 'Estação': 'Estação',
+            'Frequência (MHz)': 'Frequência (MHz)', 'Largura (kHz)': 'Largura (kHz)', 
+            'Faixa de Frequência Envolvida': 'Faixa de Frequência',
+            'Autorizado?': 'Autorizado?', 'UTE?': 'UTE?', 'Interferente?': 'Interferente?', 
+            'Detalhes da Ocorrência': 'Detalhes','Fiscal': 'Fiscal','Situação': 'Situação'
+        }
         colunas_existentes = [col for col in colunas_para_exibir.keys() if col in df.columns]
         if 'Fiscal' not in colunas_existentes and 'fiscal_warning' not in st.session_state:
             st.session_state.fiscal_warning = True
@@ -676,5 +700,3 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
-else:
-    st.warning("Nenhum dado encontrado para a seleção atual.")
