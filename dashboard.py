@@ -497,7 +497,7 @@ with header_cols[1]:
     titulo_formatado = f"<i>{titulo_data}</i>" if titulo_data == "Fora do período" else titulo_data
     st.markdown(f"""
     <div style='text-align: center;'>
-        <h1 style='margin-bottom: -15px; margin-top: -1px;'>Monitoração Remota do Espectro - COP30</h1>
+        <h1 style='margin-bottom: -15px; margin-top: -1px;'>Monitoração do Espectro - COP30</h1>
         <span class='title-subtitle' style='font-size: 1.3rem; font-weight: normal;'>Dia do evento: {titulo_formatado} &nbsp;&nbsp;-&nbsp;&nbsp; Fiscais em atividade: {fiscais_hoje}</span>
     </div>
     """, unsafe_allow_html=True)
@@ -520,7 +520,7 @@ kpi_data = [
     {"label": "Emissões verificadas", "value": len(df), "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Total de emissões detectadas e analisadas dentro do período e filtros selecionados."},
     {"label": "Não Licenciadas", "value": nao_licenciadas_filtrado, "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Contagem de emissões não autorizadas dentro dos filtros selecionados."},
     {"label": "Verificações Pendentes", "value": total_pendentes_original, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Total de emissões com situação 'Pendente' em todo o período (não afetado por filtros)."},
-    {"label": "Interferências", "value": interferencias_registradas, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Soma de todas as células 'Sim' da Aba Abordagem (coluna O) + 'Sim' da Aba Painel (coluna O)."},
+    {"label": "Interferências", "value": interferencias_registradas, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Soma de todas as interferências registradas durente o evento."},
     {"label": "BSRs (Jammers)", "value": int(bsr_jammers_count), "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Contagem total de BSRs/Jammers identificados."},
     {"label": "ERBs Fake", "value": int(erbs_fake_count), "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Contagem total de ERBs Fake identificadas."}
 ]
