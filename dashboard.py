@@ -17,7 +17,16 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-
+# Coloque este código logo após o st.set-page_config
+st.markdown("""
+<style>
+    /* Nova tentativa usando um seletor mais estável (data-testid) */
+    div[data-testid="stElementContainer"] hr {
+        margin-top: -0.8rem !important;
+        margin-bottom: -0.8rem !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 # --- 1. GERENCIAMENTO DE TEMA E ESTILOS (CSS) ---
 BASE_PALETTE = ["#1A311F", "#14337b", "#80B525", "#8D877D", "#DF1B1D", "#DBDAC9"]
 VARIANT_PALETTE = ["#4A6D55", "#4464A7", "#608A1B", "#BDBAB3", "#E85C5D", "#B3B2A5"]
@@ -544,7 +553,7 @@ if st.session_state.appanalise_bytes:
         st.session_state.appanalise_bytes = None
 
 header_cols = st.columns([0.1, 0.8, 0.1])
-with header_cols[0]: st.image("logo.png", width=135)
+with header_cols[0]: st.image("logo.png", width=115)
 with header_cols[1]:
     titulo_formatado = f"<i>{titulo_data}</i>" if titulo_data == "Fora do período" else titulo_data
     st.markdown(f"""
