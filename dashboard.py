@@ -214,55 +214,94 @@ def carregar_dados():
         client = gspread.authorize(creds)
         planilha = client.open("MONITORAÇÃO - COP30")
 
-        # --- DADOS PARA O PAINEL (GRÁFICOS E TABELAS) ---
+        # --- DADOS DO PAINEL ---
         aba_painel = planilha.worksheet("PAINEL")
         dados_painel = aba_painel.get('A1:AL')
         headers = dados_painel.pop(0)
-        df_return = pd.DataFrame(dados_painel, columns=headers)
+        df_painel = pd.DataFrame(dados_painel, columns=headers)
         
+        # --- DADOS DA ABORDAGEM ---
+        aba_abordagem = planilha.worksheet("Abordagem")
+        dados_abordagem = aba_abordagem.get('I1:W')
+        df_abordagem_final = pd.DataFrame()
+        
+        if len(dados_abordagem) > 1:
+            headers_abordagem = dados_abordagem.pop(0)
+            df_abordagem_raw = pd.DataFrame(dados_abordagem, columns=headers_abordagem)
+            
+            df_abordagem_raw.replace('', pd.NA, inplace=True)
+            df_abordagem_raw.dropna(how='all', inplace=True)
+
+            if not df_abordagem_raw.empty:
+                df_aligned = pd.DataFrame(columns=headers)
+
+                # Mapeamento explícito de Abordagem (I:W) para Painel (A:AL)
+                map_letter_to_idx = {chr(ord('I') + i): i for i in range(len(headers_abordagem))}
+
+                def get_col_data(letter):
+                    idx = map_letter_to_idx.get(letter)
+                    if idx is not None and idx < len(headers_abordagem):
+                        return df_abordagem_raw[headers_abordagem[idx]]
+                    return pd.Series([None] * len(df_abordagem_raw))
+
+                df_aligned['Data'] = get_col_data('K')
+                df_aligned['Fiscal'] = get_col_data('J')
+                df_aligned['Frequência (MHz)'] = get_col_data('M')
+                df_aligned['Largura (kHz)'] = get_col_data('N')
+                df_aligned['Faixa de Frequência Envolvida'] = get_col_data('O')
+                df_aligned['Identificação'] = get_col_data('P')
+                df_aligned['Interferente?'] = get_col_data('V')
+                if len(headers) > 10:
+                    df_aligned[headers[10]] = get_col_data('R') # UTE?
+                df_aligned['Processo SEI UTE'] = get_col_data('S')
+                df_aligned['Situação'] = get_col_data('W')
+                
+                # Tratamento do campo concatenado (T=Responsável, U=Observações)
+                responsavel = get_col_data('T').astype(str).fillna('').str.strip()
+                observacoes = get_col_data('U').astype(str).fillna('').str.strip()
+                detalhes = responsavel.str.cat(observacoes, sep=' - ').str.strip(' -').replace('', '-')
+                df_aligned['Detalhes da Ocorrência'] = detalhes
+                
+                df_aligned['Estação'] = 'Abordagem'
+                df_abordagem_final = df_aligned
+
+        # --- COMBINA OS DATAFRAMES ---
+        df_return = pd.concat([df_painel, df_abordagem_final], ignore_index=True)
+
+        # --- LIMPEZA E PROCESSAMENTO DOS DADOS COMBINADOS ---
         total_pendentes = 0
         if not df_return.empty:
             df_return.replace('', pd.NA, inplace=True)
-            df_return.dropna(subset=['Faixa de Frequência Envolvida'], inplace=True)
+            df_return.dropna(subset=['Faixa de Frequência Envolvida'], how='all', inplace=True)
             df_return['Data'] = pd.to_datetime(df_return['Data'], errors='coerce', dayfirst=True)
             if 'Detalhes da Ocorrência' in df_return.columns:
                 df_return['Detalhes da Ocorrência'] = df_return['Detalhes da Ocorrência'].fillna('-')
             if 'Situação' in df_return.columns:
                 total_pendentes = (df_return['Situação'] == 'Pendente').sum()
 
-        # --- CÁLCULOS ESPECÍFICOS PARA OS KPIs ---
-        aba_abordagem = planilha.worksheet("Abordagem")
+        # --- CÁLCULOS DE KPIs ---
+        col_f_painel = aba_painel.col_values(6)
+        col_m_abordagem = aba_abordagem.col_values(13)
+        kpi_emissoes_verificadas = sum(1 for c in col_f_painel[1:] if c) + sum(1 for c in col_m_abordagem[1:] if c)
 
-        # 1. KPI Emissões Verificadas
-        col_f_painel = aba_painel.col_values(6) # Coluna F
-        col_m_abordagem = aba_abordagem.col_values(13) # Coluna M
-        count_painel = sum(1 for cell in col_f_painel[1:] if cell) # Pula o cabeçalho
-        count_abordagem = sum(1 for cell in col_m_abordagem[1:] if cell) # Pula o cabeçalho
-        kpi_emissoes_verificadas = count_painel + count_abordagem
-
-        # 2. KPI Não Licenciadas
-        col_j_painel = aba_painel.col_values(10) # Coluna J
-        col_q_abordagem = aba_abordagem.col_values(17) # Coluna Q
+        col_j_painel = aba_painel.col_values(10)
+        col_q_abordagem = aba_abordagem.col_values(17)
         kpi_nao_licenciadas = col_j_painel.count('Não') + col_q_abordagem.count('Não')
 
-        # 3. KPI Interferências
-        col_o_painel = aba_painel.col_values(15) # Coluna O
-        col_v_abordagem = aba_abordagem.col_values(22) # Coluna V
+        col_o_painel = aba_painel.col_values(15)
+        col_v_abordagem = aba_abordagem.col_values(22)
         kpi_interferencias = col_o_painel.count('Sim') + col_v_abordagem.count('Sim')
 
-        # --- LÓGICA PARA OUTROS KPIs (inalterada) ---
         fiscais_datas_str = aba_painel.get('W1:AL1')[0]
         fiscais_valores = aba_painel.get('W2:AL2')[0]
         hoje_brasil = datetime.now(pytz.timezone('America/Sao_Paulo'))
-        hoje_completo_str = hoje_brasil.strftime('%d/%m/%Y')
-        hoje_curto_str = hoje_brasil.strftime('%d/%m')
-        fiscais_hoje = "0"
         titulo_data = "Fora do período"
+        fiscais_hoje = "0"
         if len(fiscais_datas_str) == len(fiscais_valores):
             for i, data_str in enumerate(fiscais_datas_str):
-                if str(data_str).strip() == hoje_completo_str:
+                if str(data_str).strip() == hoje_brasil.strftime('%d/%m/%Y'):
                     fiscais_hoje = fiscais_valores[i]
-                    titulo_data = hoje_curto_str
+                    titulo_data = hoje_brasil.strftime('%d/%m')
                     break
         
         bsr_jammers_count, erbs_fake_count = 0, 0
@@ -295,7 +334,6 @@ for df_info in [estacoes_info, miaer_info, cellpl_info]:
     df_info['NomeFormatado'] = df_info['Nome'].str.title()
     df_info['rotulo'] = df_info['Estação'] + ' - ' + df_info['NomeFormatado']
 
-# --- ATUALIZA A CHAMADA DA FUNÇÃO PARA RECEBER OS NOVOS VALORES DE KPI ---
 (df_original, ultima_atualizacao, titulo_data, fiscais_hoje, 
  total_pendentes_original, bsr_jammers_count, erbs_fake_count, 
  kpi_emissoes_verificadas, kpi_nao_licenciadas, kpi_interferencias) = carregar_dados()
@@ -324,7 +362,7 @@ with st.sidebar:
     estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e not in ['Miaer', 'CWSM211022']])
 
     if not df_original.empty:
-        df_filtros = df_original.copy().dropna(subset=['Data'])
+        df_filtros = df_original[df_original['Data'].notna()].copy()
         
         for key in ['faixa_selecionada', 'frequencia_selecionada', 'interferente_selecionado', 'licenciamento_selecionado', 'ocorrencia_selecionada', 'ute_selecionado']:
             if key not in st.session_state: st.session_state[key] = 'Todas'
@@ -354,7 +392,7 @@ with st.sidebar:
             for station in estacoes_lista:
                 st.checkbox(station, key=f'station_{station}')
 
-        faixas_lista = ['Todas'] + sorted(list(df_original['Faixa de Frequência Envolvida'].unique()))
+        faixas_lista = ['Todas'] + sorted(list(df_original['Faixa de Frequência Envolvida'].dropna().unique()))
         st.selectbox('Faixa de Frequência:', faixas_lista, key='faixa_selecionada')
 
         if 'Frequência (MHz)' in df_original.columns:
@@ -386,11 +424,7 @@ with st.sidebar:
         "Regulamento sobre BSRs": "https://informacoes.anatel.gov.br/legislacao/resolucoes/2023/1842-resolucao-760",
         "PDFF 2025": "https://informacoes.anatel.gov.br/legislacao/resolucoes/2025/2001-resolucao-772"
     }
-    selected_normativo = st.selectbox(
-        'Consulta de normativos',
-        list(normativos_links.keys()),
-        index=0
-    )
+    selected_normativo = st.selectbox('Consulta de normativos', list(normativos_links.keys()), index=0)
     if selected_normativo and normativos_links[selected_normativo]:
         st.markdown(f"**Acessar:** [{selected_normativo}]({normativos_links[selected_normativo]})")
     st.markdown("---")
@@ -406,15 +440,12 @@ with st.sidebar:
     st.markdown("---")
     st.markdown('<div class="sidebar-logo">', unsafe_allow_html=True)
     _, logo1_col, logo2_col, _ = st.columns([0.5, 1, 1, 0.5])
-    with logo1_col:
-        st.image("anatelS.png", width=106)
-    with logo2_col:
-        st.image("ods.png", width=106)
+    with logo1_col: st.image("anatelS.png", width=106)
+    with logo2_col: st.image("ods.png", width=106)
     st.markdown('</div>', unsafe_allow_html=True)
 
 df = df_original.copy()
 if not df.empty:
-    # Adiciona a coluna 'UTE?' baseada na coluna K (índice 10)
     if len(df.columns) > 10:
         coluna_k_nome = df.columns[10]
         df['UTE?'] = df[coluna_k_nome].apply(lambda x: 'Sim' if str(x).strip().upper() in ['TRUE', 'SIM'] else 'Não')
@@ -429,38 +460,38 @@ if not df.empty:
     if any_date_options and not datas_selecionadas_list:
         df = pd.DataFrame(columns=df_original.columns)
     elif datas_selecionadas_list:
-        datas_para_filtrar = [pd.to_datetime(data.replace('date_', ''), errors='coerce') for data in datas_selecionadas_list]
-        df = df.loc[df['Data'].isin(datas_para_filtrar)]
+        df_non_na = df[df['Data'].notna()]
+        datas_para_filtrar = [pd.to_datetime(d.replace('date_', ''), errors='coerce').date() for d in datas_selecionadas_list]
+        df = df[df['Data'].dt.date.isin(datas_para_filtrar) | df['Data'].isna()]
+
+    df_abordagem_rows = df[df['Estação'] == 'Abordagem']
+    df_rfeye_rows = df[df['Estação'] != 'Abordagem']
+    estacoes_selecionadas = [s for s in estacoes_lista if st.session_state.get(f'station_{s}', False)]
     
-    estacoes_selecionadas = [station for station in estacoes_lista if st.session_state.get(f'station_{station}', False)]
     if any(st.session_state.get(f'station_{s}', False) for s in estacoes_lista):
-        df = df[df['Estação'].isin(estacoes_selecionadas)]
+        df_rfeye_filtered = df_rfeye_rows[df_rfeye_rows['Estação'].isin(estacoes_selecionadas)]
     else:
-        df = pd.DataFrame(columns=df_original.columns)
-    
+        df_rfeye_filtered = pd.DataFrame(columns=df.columns)
+
+    df = pd.concat([df_rfeye_filtered, df_abordagem_rows], ignore_index=True)
+
     if st.session_state.get('faixa_selecionada', 'Todas') != 'Todas': 
         df = df[df['Faixa de Frequência Envolvida'] == st.session_state.faixa_selecionada]
-    
     if st.session_state.get('frequencia_selecionada', 'Todas') != 'Todas': 
         df = df[df['Frequência (MHz)'] == st.session_state.frequencia_selecionada]
-    
     if st.session_state.get('interferente_selecionado', 'Todas') != 'Todas': 
         df = df[df['Interferente?'] == st.session_state.interferente_selecionado]
-    
     if st.session_state.get('licenciamento_selecionado', 'Todas') != 'Todas':
         selecao = st.session_state.licenciamento_selecionado
         if selecao == 'Não licenciado':
             df = df[df['Autorizado?'].astype(str).str.strip().str.upper() == 'NÃO']
         else:
             df = df[df['Autorizado?'].astype(str).str.strip() == selecao]
-            
     if st.session_state.get('ocorrencia_selecionada', 'Todas') != 'Todas':
         map_status = {'Pendentes': 'Pendente', 'Concluídas': 'Concluído'}
         df = df[df['Situação'] == map_status[st.session_state.ocorrencia_selecionada]]
-
     if st.session_state.get('ute_selecionado', 'Todas') != 'Todas':
         df = df[df['UTE?'] == st.session_state.ute_selecionado]
-
 
 if not st.session_state.confirm_export:
     with placeholder_sidebar.container():
@@ -532,7 +563,6 @@ elif df_original.empty:
     st.info("Nenhum dado carregado da planilha.")
     st.stop()
     
-# --- ATUALIZA A LISTA DE KPIs PARA USAR AS NOVAS VARIÁVEIS ---
 kpi_cols = st.columns(6, gap="small")
 kpi_data = [
     {"label": "Emissões verificadas", "value": kpi_emissoes_verificadas, "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Total de emissões não vazias (F da Painel + M da Abordagem)."},
@@ -548,18 +578,18 @@ for i, data in enumerate(kpi_data):
         st.markdown(f"""
         <div class="kpi-box" style="background-image: {data['color']};">
             <div class="info-icon-container">
-                <span class="info-icon">i</span>
-                <span class="tooltip-text">{data['tooltip']}</span>
+                <span class="info-icon">i</span><span class="tooltip-text">{data['tooltip']}</span>
             </div>
-            <div class="kpi-label">{data['label']}</div>
-            <div class="kpi-value">{data['value']}</div>
-        </div>
-        """, unsafe_allow_html=True)
+            <div class="kpi-label">{data['label']}</div><div class="kpi-value">{data['value']}</div>
+        </div>""", unsafe_allow_html=True)
         
 st.markdown('<div style="margin-top: 2.5rem;"></div>', unsafe_allow_html=True)
 
 if not df.empty:
     df_com_nomes = pd.merge(df, estacoes_info[['Estação', 'Nome']], on='Estação', how='left')
+    if 'Nome' in df_com_nomes.columns:
+        df_com_nomes['Nome'].fillna('Abordagem', inplace=True)
+    
     top_col1, top_col2, top_col3 = st.columns([0.3, 0.3, 0.4], gap="small")
     with top_col1:
         with st.container():
@@ -606,26 +636,13 @@ if not df.empty:
             all_estacoes_info = pd.concat([estacoes_info, miaer_info, cellpl_info], ignore_index=True)
             center_lat, center_lon = all_estacoes_info['lat'].mean(), all_estacoes_info['lon'].mean()
             estacoes_filtradas_mapa = [s for s in estacoes_lista if st.session_state.get(f'station_{s}')]
-            default_color = "#1A311F"
-            selected_color = "#14337b"
+            default_color, selected_color = "#1A311F", "#14337b"
             all_estacoes_info['map_color'] = default_color
             if estacoes_filtradas_mapa:
                 all_estacoes_info.loc[all_estacoes_info['Estação'].isin(estacoes_filtradas_mapa), 'map_color'] = selected_color
-            fig_mapa = px.scatter_mapbox(
-                all_estacoes_info, 
-                lat="lat", 
-                lon="lon", 
-                size_max=25, 
-                text="rotulo", 
-                hover_name="rotulo", 
-                zoom=10, 
-                height=424,
-                color='map_color',
-                color_discrete_map="identity"
-            )
+            fig_mapa = px.scatter_mapbox(all_estacoes_info, lat="lat", lon="lon", size_max=25, text="rotulo", hover_name="rotulo", zoom=10, height=424, color='map_color', color_discrete_map="identity")
             fig_mapa.update_traces(marker=dict(size=13), textfont_color='#1A311F', textposition='middle right')
-            fig_mapa.update_layout(mapbox_style="carto-positron", mapbox_center={"lat": center_lat, "lon": center_lon}, margin={"r":0, "t":0, "l":0, "b":0}, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                                  uniformtext=dict(minsize=6, mode='show'),
+            fig_mapa.update_layout(mapbox_style="carto-positron", mapbox_center={"lat": center_lat, "lon": center_lon}, margin={"r":0, "t":0, "l":0, "b":0}, showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', uniformtext=dict(minsize=6, mode='show'),
                                   mapbox_layers=[
                                       {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.46271165940957,-1.410547386930189], [-48.46354296701018,-1.410203920775152], [-48.46452300205883,-1.410589379729715], [-48.46481338341509,-1.410947294928633], [-48.46480901688122,-1.411743890008883], [-48.46476950492082,-1.412718397847341], [-48.46501339404546,-1.413220476289419], [-48.46505954643188,-1.413593356218595], [-48.46299946948039,-1.415682109733712], [-48.46223745889785,-1.41493726617121], [-48.46193440440009,-1.41506754383678], [-48.46160981147195,-1.415618320052126], [-48.46236515358898,-1.41646519254085], [-48.46029976924051,-1.418538693038281], [-48.45921609865986,-1.417408620572469], [-48.4612069857882,-1.41539858384322], [-48.45963018655848,-1.413805502459938], [-48.46271165940957,-1.410547386930189]]]}}]}'), "type": "fill", "color": "rgba(0, 255, 0, 0.5)"},
                                       {"source": json.loads('{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Polygon", "coordinates": [[[-48.45959464675182,-1.413824160742325], [-48.46115955268121,-1.41541976951611], [-48.45902894923615,-1.417522902260756], [-48.45638287288467,-1.420317822531534], [-48.45765406178806,-1.422206297114926], [-48.45764136955441,-1.422452385058413], [-48.45687501383681,-1.423154480079293], [-48.45559653463967,-1.422811508724929], [-48.454740001063,-1.42206627992075], [-48.4541426707238,-1.421661972091132], [-48.45383496756163,-1.419824290338865], [-48.45959464675182,-1.413824160742325]]]}}]}'), "type": "fill", "color": "rgba(0, 0, 255, 0.5)"}
@@ -643,31 +660,26 @@ if not df.empty:
                 fig_estacao_dia.update_traces(textposition='inside', textfont_size=12)
                 fig_estacao_dia.update_xaxes(tickformat="%d/%m", title_text='')
                 fig_estacao_dia.update_yaxes(title_text='', dtick=1)
-                fig_estacao_dia.update_layout(
-                    legend_title='', 
-                    margin={"r":19, "t":10, "l":0, "b":10}, 
-                    paper_bgcolor='rgba(141, 135, 121, 0.2)', 
-                    plot_bgcolor='rgba(0,0,0,0)', 
-                    height=424,
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=-0.2,
-                        xanchor="center",
-                        x=0.5
-                    )
-                )
+                fig_estacao_dia.update_layout(legend_title='', margin={"r":19, "t":10, "l":0, "b":10}, paper_bgcolor='rgba(141, 135, 121, 0.2)', plot_bgcolor='rgba(0,0,0,0)', height=424, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
                 st.plotly_chart(fig_estacao_dia, use_container_width=True)
             else: st.info("Nenhuma emissão com data válida na seleção.")
     st.markdown('<div class="page-break-before"></div>', unsafe_allow_html=True)
     with st.container():
         st.markdown('<div class="table-container-style"></div>', unsafe_allow_html=True)
+        # AJUSTE FINAL: Coluna 'Detalhes' removida e 'Faixa de Frequência' encurtada.
         colunas_para_exibir = {
-            'Data': 'Data', 'Nome': 'Região', 'Estação': 'Estação',
-            'Frequência (MHz)': 'Frequência (MHz)', 'Largura (kHz)': 'Largura (kHz)', 
-            'Faixa de Frequência Envolvida': 'Faixa de Frequência',
-            'Autorizado?': 'Autorizado?', 'UTE?': 'UTE?', 'Interferente?': 'Interferente?', 
-            'Detalhes da Ocorrência': 'Detalhes','Fiscal': 'Fiscal','Situação': 'Situação'
+            'Data': 'Data', 
+            'Nome': 'Região', 
+            'Estação': 'Estação',
+            'Frequência (MHz)': 'Frequência (MHz)', 
+            'Largura (kHz)': 'Largura (kHz)', 
+            'Faixa de Frequência Envolvida': 'Faixa', # Encurtado
+            'Autorizado?': 'Autorizado?', 
+            'UTE?': 'UTE?', 
+            'Identificação': 'Tipo de Emissão',
+            'Interferente?': 'Interferente?', 
+            'Fiscal': 'Fiscal',
+            'Situação': 'Situação'
         }
         colunas_existentes = [col for col in colunas_para_exibir.keys() if col in df.columns]
         if 'Fiscal' not in colunas_existentes and 'fiscal_warning' not in st.session_state:
@@ -681,21 +693,15 @@ if not df.empty:
             df_tabela['Data'] = pd.to_datetime(df_tabela['Data'], errors='coerce')
             df_tabela.sort_values(by='Data', ascending=False, inplace=True)
             df_tabela['Data'] = df_tabela['Data'].dt.strftime('%d/%m/%Y')
-        if 'Região' in df_tabela.columns and 'Nome' in df_com_nomes.columns:
-            df_tabela['Região'] = pd.merge(df, estacoes_info[['Estação', 'Nome']], on='Estação', how='left')['Nome'].str.title()
-        if 'Detalhes' in df_tabela.columns: df_tabela['Detalhes'] = df_tabela['Detalhes'].replace('', '-').fillna('-')
+        if 'Região' in df_tabela.columns:
+            df_tabela['Região'] = pd.merge(df, estacoes_info[['Estação', 'Nome']], on='Estação', how='left')['Nome'].fillna('Abordagem').str.title()
+
         df_para_exportar = df_tabela.copy()
         df_xlsx = to_excel(df_para_exportar)
         col_titulo, col_botao = st.columns([0.8, 0.2])
         with col_titulo: st.subheader("Histórico geral de identificações")
         with col_botao: 
-            st.download_button(
-                label="📥 Exportar (.xlsx)", 
-                data=df_xlsx, 
-                file_name='historico_cop30.xlsx', 
-                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
-                use_container_width=True
-            )
+            st.download_button(label="📥 Exportar (.xlsx)", data=df_xlsx, file_name='historico_cop30.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', use_container_width=True)
         gb = GridOptionsBuilder.from_dataframe(df_tabela)
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
