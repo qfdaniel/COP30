@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 
 # --- 0. CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
-    page_title="Monitoração Remota - COP30",
+    page_title="Monitoração do Espectro - COP30",
     page_icon="logo.png",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -713,3 +713,4 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
