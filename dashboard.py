@@ -368,7 +368,8 @@ with st.sidebar:
     st.toggle('Modo Dark', key='theme_toggle', value=(st.session_state.theme == 'Dark'), on_change=toggle_theme)
     st.title("Filtros")
     
-    estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e not in ['Miaer', 'CWSM211022']])
+    # MODIFICAÇÃO: Adicionado 'Abordagem' à lista de filtros de estação
+    estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e not in ['Miaer', 'CWSM211022']]) + ['Abordagem']
 
     if not df_original.empty:
         df_filtros = df_original[df_original['Data'].notna()].copy()
@@ -473,16 +474,13 @@ if not df.empty:
         datas_para_filtrar = [pd.to_datetime(d.replace('date_', ''), errors='coerce').date() for d in datas_selecionadas_list]
         df = df[df['Data'].dt.date.isin(datas_para_filtrar) | df['Data'].isna()]
 
-    df_abordagem_rows = df[df['Estação'] == 'Abordagem']
-    df_rfeye_rows = df[df['Estação'] != 'Abordagem']
+    # MODIFICAÇÃO: Lógica de filtro de estação simplificada e corrigida
     estacoes_selecionadas = [s for s in estacoes_lista if st.session_state.get(f'station_{s}', False)]
-    
     if any(st.session_state.get(f'station_{s}', False) for s in estacoes_lista):
-        df_rfeye_filtered = df_rfeye_rows[df_rfeye_rows['Estação'].isin(estacoes_selecionadas)]
+        df = df[df['Estação'].isin(estacoes_selecionadas)]
     else:
-        df_rfeye_filtered = pd.DataFrame(columns=df.columns)
-
-    df = pd.concat([df_rfeye_filtered, df_abordagem_rows], ignore_index=True)
+        # Se nenhuma estação for selecionada, o dataframe fica vazio
+        df = pd.DataFrame(columns=df.columns)
 
     if st.session_state.get('faixa_selecionada', 'Todas') != 'Todas': 
         df = df[df['Faixa de Frequência Envolvida'] == st.session_state.faixa_selecionada]
@@ -644,7 +642,7 @@ if not df.empty:
             st.subheader("Mapa das Estações")
             all_estacoes_info = pd.concat([estacoes_info, miaer_info, cellpl_info], ignore_index=True)
             center_lat, center_lon = all_estacoes_info['lat'].mean(), all_estacoes_info['lon'].mean()
-            estacoes_filtradas_mapa = [s for s in estacoes_lista if st.session_state.get(f'station_{s}')]
+            estacoes_filtradas_mapa = [s for s in estacoes_lista if st.session_state.get(f'station_{s}') and s != 'Abordagem']
             default_color, selected_color = "#1A311F", "#14337b"
             all_estacoes_info['map_color'] = default_color
             if estacoes_filtradas_mapa:
