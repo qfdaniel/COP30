@@ -259,6 +259,7 @@ def carregar_dados():
                 df_aligned['Largura (kHz)'] = get_col_data('N')
                 df_aligned['Faixa de Frequência Envolvida'] = get_col_data('O')
                 df_aligned['Identificação'] = get_col_data('P')
+                df_aligned['Autorizado?'] = get_col_data('Q')
                 df_aligned['Interferente?'] = get_col_data('V')
                 if len(headers) > 10:
                     df_aligned[headers[10]] = get_col_data('R') # UTE?
@@ -713,4 +714,5 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
