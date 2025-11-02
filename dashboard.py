@@ -214,7 +214,9 @@ def to_excel(df: pd.DataFrame):
         df.to_excel(writer, index=False, sheet_name='Dados')
     return output.getvalue()
 
-# --- FUNÇÃO DE CARREGAMENTO DE DADOS ATUALIZADA COM AS NOVAS REGRAS ---
+# --- FUNÇÃO DE CARREGAMENTO DE DADOS (VERSÃO ORIGINAL CORRETA) ---
+# Esta é a função original do seu script, que é a correta,
+# pois ela depende da sua fórmula QUERY na aba "PAINEL".
 @st.cache_data(ttl=30, show_spinner="Buscando novos dados da planilha...")
 def carregar_dados():
     try:
@@ -329,6 +331,7 @@ def carregar_dados():
     except Exception as e:
         st.error(f"Erro ao carregar os dados: {e}")
         return pd.DataFrame(), None, "Erro", "0", 0, 0, 0, 0, 0, 0
+
 estacoes_info = pd.DataFrame({
     'Estação': ['RFeye002129', 'RFeye002175', 'RFeye002315', 'RFeye002012', 'RFeye002303', 'RFeye002093'],
     'Nome': ['MANGUEIRINHO', 'ALDEIA', 'DOCAS', 'OUTEIRO', 'PARQUE da CIDADE', 'ANATEL'],
@@ -339,14 +342,13 @@ estacoes_info = pd.DataFrame({
 miaer_info = pd.DataFrame({'Estação': ['Miaer'], 'Nome': ['CENSIPAM'], 'lat': [-1.409319], 'lon': [-48.462516], 'size': 25})
 cellpl_info = pd.DataFrame({'Estação': ['CWSM211022'], 'Nome': ['UFPA'], 'lat': [-1.476756], 'lon': [-48.456606], 'size': 25})
 
-# Bloco Novo (Substituição)
-# Combina todos os metadados das estações em um único DataFrame
-# Linha Nova (Substituição)
-# A variável 'all_estacoes_info' já foi criada no início do script.
-
-# Aplica a formatação em todos de uma vez
+# --- CORREÇÃO 1: UNIFICAR METADADOS ---
+# Substituímos o loop 'for' anterior por este bloco, que cria um
+# DataFrame unificado 'all_estacoes_info' para usar em todo o script.
+all_estacoes_info = pd.concat([estacoes_info, miaer_info, cellpl_info], ignore_index=True)
 all_estacoes_info['NomeFormatado'] = all_estacoes_info['Nome'].str.title()
 all_estacoes_info['rotulo'] = all_estacoes_info['Estação'] + ' - ' + all_estacoes_info['NomeFormatado']
+
 
 (df_original, ultima_atualizacao, titulo_data, fiscais_hoje, 
  total_pendentes_original, bsr_jammers_count, erbs_fake_count, 
@@ -373,8 +375,8 @@ with st.sidebar:
     st.toggle('Modo Dark', key='theme_toggle', value=(st.session_state.theme == 'Dark'), on_change=toggle_theme)
     st.title("Filtros")
     
-    # MODIFICAÇÃO: Adicionado 'Abordagem' à lista de filtros de estação
-    # Bloco Novo (Substituição)
+    # --- CORREÇÃO 2: LISTA DE FILTROS ---
+    # A lista de filtros agora usa o DataFrame unificado 'all_estacoes_info'
     estacoes_lista = sorted(all_estacoes_info['Estação'].unique().tolist()) + ['Abordagem']
 
     if not df_original.empty:
@@ -599,7 +601,10 @@ for i, data in enumerate(kpi_data):
 st.markdown('<div style="margin-top: 2.5rem;"></div>', unsafe_allow_html=True)
 
 if not df.empty:
+    # --- CORREÇÃO 3: GRÁFICO "EMISSÕES POR REGIÃO" ---
+    # Trocamos 'estacoes_info' por 'all_estacoes_info' para buscar os Nomes.
     df_com_nomes = pd.merge(df, all_estacoes_info[['Estação', 'Nome']], on='Estação', how='left')
+    
     if 'Nome' in df_com_nomes.columns:
         df_com_nomes['Nome'].fillna('Abordagem', inplace=True)
     
@@ -646,7 +651,11 @@ if not df.empty:
         with st.container():
             st.markdown('<div class="style-marker"></div>', unsafe_allow_html=True)
             st.subheader("Mapa das Estações")
-            all_estacoes_info = pd.concat([estacoes_info, miaer_info, cellpl_info], ignore_index=True)
+            
+            # --- CORREÇÃO 4: MAPA ---
+            # A linha que recriava 'all_estacoes_info' foi removida,
+            # pois a variável já existe.
+            
             center_lat, center_lon = all_estacoes_info['lat'].mean(), all_estacoes_info['lon'].mean()
             estacoes_filtradas_mapa = [s for s in estacoes_lista if st.session_state.get(f'station_{s}') and s != 'Abordagem']
             default_color, selected_color = "#1A311F", "#14337b"
@@ -706,6 +715,10 @@ if not df.empty:
             df_tabela['Data'] = pd.to_datetime(df_tabela['Data'], errors='coerce')
             df_tabela.sort_values(by='Data', ascending=False, inplace=True)
             df_tabela['Data'] = df_tabela['Data'].dt.strftime('%d/%m/%Y')
+        
+        # --- CORREÇÃO 5: TABELA ---
+        # Trocamos 'estacoes_info' por 'all_estacoes_info' para buscar os Nomes
+        # para a coluna 'Região' da tabela.
         if 'Região' in df_tabela.columns:
             df_tabela['Região'] = pd.merge(df, all_estacoes_info[['Estação', 'Nome']], on='Estação', how='left')['Nome'].fillna('Abordagem').str.title()
 
@@ -719,10 +732,3 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
-
-
-
-
-
-
-
