@@ -214,7 +214,7 @@ def to_excel(df: pd.DataFrame):
         df.to_excel(writer, index=False, sheet_name='Dados')
     return output.getvalue()
 
-# --- FUNÇÃO DE CARREGAMENTO DE DADOS OTIMIZADA (ANTI-QUOTA) ---
+# --- FUNÇÃO DE CARREGAMENTO DE DADOS ATUALIZADA COM AS NOVAS REGRAS ---
 @st.cache_data(ttl=30, show_spinner="Buscando novos dados da planilha...")
 def carregar_dados():
     try:
@@ -223,109 +223,62 @@ def carregar_dados():
         client = gspread.authorize(creds)
         planilha = client.open("MONITORAÇÃO - COP30")
 
-        # --- 1. LEITURA DA ABA ABORDAGEM (APENAS 1 VEZ) ---
+        # --- DADOS DO PAINEL ---
+        aba_painel = planilha.worksheet("PAINEL")
+        dados_painel = aba_painel.get('A1:AL')
+        headers = dados_painel.pop(0)
+        df_painel = pd.DataFrame(dados_painel, columns=headers)
+        
+        # --- DADOS DA ABORDAGEM ---
         aba_abordagem = planilha.worksheet("Abordagem")
-        dados_abordagem_full = aba_abordagem.get('I1:W') # get() único
+        dados_abordagem = aba_abordagem.get('I1:W')
         df_abordagem_final = pd.DataFrame()
-        df_abordagem_raw = pd.DataFrame() # Para KPIs
-
-        if len(dados_abordagem_full) > 1:
-            headers_abordagem = dados_abordagem_full.pop(0)
-            df_abordagem_raw = pd.DataFrame(dados_abordagem_full, columns=headers_abordagem)
+        
+        if len(dados_abordagem) > 1:
+            headers_abordagem = dados_abordagem.pop(0)
+            df_abordagem_raw = pd.DataFrame(dados_abordagem, columns=headers_abordagem)
             
-            df_abordagem_raw_cleaned = df_abordagem_raw.replace('', pd.NA).dropna(how='all')
+            df_abordagem_raw.replace('', pd.NA, inplace=True)
+            df_abordagem_raw.dropna(how='all', inplace=True)
 
-            if not df_abordagem_raw_cleaned.empty:
-                # Mapeamento explícito de Abordagem (I:W)
+            if not df_abordagem_raw.empty:
+                df_aligned = pd.DataFrame(columns=headers)
+
+                # Mapeamento explícito de Abordagem (I:W) para Painel (A:AL)
                 map_letter_to_idx = {chr(ord('I') + i): i for i in range(len(headers_abordagem))}
-                
+
                 def get_col_data(letter):
                     idx = map_letter_to_idx.get(letter)
                     if idx is not None and idx < len(headers_abordagem):
-                        return df_abordagem_raw_cleaned[headers_abordagem[idx]]
-                    return pd.Series([None] * len(df_abordagem_raw_cleaned))
+                        return df_abordagem_raw[headers_abordagem[idx]]
+                    return pd.Series([None] * len(df_abordagem_raw))
 
-                # Criar um DataFrame alinhado (os headers reais serão definidos pela aba PAINEL)
-                df_aligned_data = {
-                    'Data': get_col_data('K'),
-                    'Fiscal': get_col_data('J'),
-                    'Frequência (MHz)': get_col_data('M'),
-                    'Largura (kHz)': get_col_data('N'),
-                    'Faixa de Frequência Envolvida': get_col_data('O'),
-                    'Identificação': get_col_data('P'),
-                    'Autorizado?': get_col_data('Q'),
-                    'Interferente?': get_col_data('V'),
-                    'Coluna_K_UTE': get_col_data('R'), # Nome temporário
-                    'Processo SEI UTE': get_col_data('S'),
-                    'Situação': get_col_data('W'),
-                }
+                df_aligned['Data'] = get_col_data('K')
+                df_aligned['Fiscal'] = get_col_data('J')
+                df_aligned['Frequência (MHz)'] = get_col_data('M')
+                df_aligned['Largura (kHz)'] = get_col_data('N')
+                df_aligned['Faixa de Frequência Envolvida'] = get_col_data('O')
+                df_aligned['Identificação'] = get_col_data('P')
+                df_aligned['Autorizado?'] = get_col_data('Q')
+                df_aligned['Interferente?'] = get_col_data('V')
+                if len(headers) > 10:
+                    df_aligned[headers[10]] = get_col_data('R') # UTE?
+                df_aligned['Processo SEI UTE'] = get_col_data('S')
+                df_aligned['Situação'] = get_col_data('W')
                 
+                # Tratamento do campo concatenado (T=Responsável, U=Observações)
                 responsavel = get_col_data('T').astype(str).fillna('').str.strip()
                 observacoes = get_col_data('U').astype(str).fillna('').str.strip()
                 detalhes = responsavel.str.cat(observacoes, sep=' - ').str.strip(' -').replace('', '-')
-                df_aligned_data['Detalhes da Ocorrência'] = detalhes
-                df_aligned_data['Estação'] = 'Abordagem'
+                df_aligned['Detalhes da Ocorrência'] = detalhes
                 
-                df_abordagem_final = pd.DataFrame(df_aligned_data)
+                df_aligned['Estação'] = 'Abordagem'
+                df_abordagem_final = df_aligned
 
-        # --- 2. LEITURA DAS ABAS DE ESTAÇÕES (APENAS 1 VEZ CADA) ---
-        nomes_abas_estacoes = [
-            "PAINEL", # PAINEL é a primeira para definir os headers
-            "RFeye002093 - ANATEL",
-            "RFeye002303 - PARQUE DA CIDADE",
-            "RFeye002315 - DOCAS",
-            "RFeye002012 - OUTEIRO",
-            "RFeye002175 - ALDEIA",
-            "RFeye002129 - MANGUEIRINHO",
-            "CWSM - UFPA",
-            "Miaer - PARQUE DA CIDADE"
-        ]
+        # --- COMBINA OS DATAFRAMES ---
+        df_return = pd.concat([df_painel, df_abordagem_final], ignore_index=True)
 
-        lista_dfs_estacoes = []
-        headers_estacoes = None
-        df_painel_kpi = pd.DataFrame() # Para KPIs
-
-        for nome_aba in nomes_abas_estacoes:
-            try:
-                aba_estacao = planilha.worksheet(nome_aba)
-                dados_estacao = aba_estacao.get('A1:AL') # get() único por aba
-                
-                if not dados_estacao: continue 
-                
-                current_headers = dados_estacao.pop(0)
-                if headers_estacoes is None:
-                    headers_estacoes = current_headers
-                
-                if dados_estacao:
-                    df_temp = pd.DataFrame(dados_estacao, columns=headers_estacoes)
-                    lista_dfs_estacoes.append(df_temp)
-                    
-                    if nome_aba == "PAINEL":
-                        df_painel_kpi = df_temp # Guarda dados da PAINEL para KPIs
-
-            except gspread.exceptions.WorksheetNotFound:
-                print(f"Aviso: Aba '{nome_aba}' não foi encontrada. Pulando...")
-            except Exception as e:
-                print(f"Aviso: Erro ao ler a aba '{nome_aba}': {e}. Pulando...")
-
-        if not lista_dfs_estacoes:
-            if headers_estacoes is None:
-                st.error("Erro crítico: Não foi possível carregar headers da aba 'PAINEL'. Verifique se a aba existe.")
-                return pd.DataFrame(), None, "Erro", "0", 0, 0, 0, 0, 0, 0
-            df_estacoes_consolidadas = pd.DataFrame(columns=headers_estacoes)
-        else:
-            df_estacoes_consolidadas = pd.concat(lista_dfs_estacoes, ignore_index=True)
-
-        # --- 3. AJUSTE E COMBINAÇÃO FINAL ---
-        if not df_abordagem_final.empty:
-            # Renomeia a coluna temporária de UTE da Abordagem para o nome real da PAINEL
-            if len(headers_estacoes) > 10:
-                nome_coluna_k_real = headers_estacoes[10] # Coluna K
-                df_abordagem_final.rename(columns={'Coluna_K_UTE': nome_coluna_k_real}, inplace=True)
-
-        df_return = pd.concat([df_estacoes_consolidadas, df_abordagem_final], ignore_index=True, sort=False)
-
-        # --- 4. LIMPEZA E PROCESSAMENTO (usando df_return) ---
+        # --- LIMPEZA E PROCESSAMENTO DOS DADOS COMBINADOS ---
         total_pendentes = 0
         if not df_return.empty:
             df_return.replace('', pd.NA, inplace=True)
@@ -334,72 +287,47 @@ def carregar_dados():
             if 'Detalhes da Ocorrência' in df_return.columns:
                 df_return['Detalhes da Ocorrência'] = df_return['Detalhes da Ocorrência'].fillna('-')
             if 'Situação' in df_return.columns:
-                # Calcula pendentes a partir do DF consolidado
                 total_pendentes = (df_return['Situação'] == 'Pendente').sum()
 
-        # --- 5. CÁLCULO DE KPIs (usando DataFrames em memória, SEM NOVAS CHAMADAS API) ---
+        # --- CÁLCULOS DE KPIs ---
+        col_f_painel = aba_painel.col_values(6)
+        col_m_abordagem = aba_abordagem.col_values(13)
+        kpi_emissoes_verificadas = sum(1 for c in col_f_painel[1:] if c) + sum(1 for c in col_m_abordagem[1:] if c)
 
-        # KPI Emissões Verificadas
-        kpi_emissoes_verificadas = 0
-        if not df_painel_kpi.empty and 'Frequência (MHz)' in df_painel_kpi.columns:
-            kpi_emissoes_verificadas += df_painel_kpi['Frequência (MHz)'].replace('', pd.NA).count()
-        if not df_abordagem_raw.empty and 'Frequência (MHz)' in df_abordagem_raw.columns:
-            kpi_emissoes_verificadas += df_abordagem_raw['Frequência (MHz)'].replace('', pd.NA).count()
-        
-        # KPI Não Licenciadas
-        kpi_nao_licenciadas = 0
-        if not df_painel_kpi.empty and 'Autorizado?' in df_painel_kpi.columns:
-            kpi_nao_licenciadas += (df_painel_kpi['Autorizado?'] == 'Não').sum()
-        if not df_abordagem_raw.empty and 'Autorizado?' in df_abordagem_raw.columns:
-            kpi_nao_licenciadas += (df_abordagem_raw['Autorizado?'] == 'Não').sum()
-            
-        # KPI Interferências
-        kpi_interferencias = 0
-        if not df_painel_kpi.empty and 'Interferente?' in df_painel_kpi.columns:
-            kpi_interferencias += (df_painel_kpi['Interferente?'] == 'Sim').sum()
-        if not df_abordagem_raw.empty and 'Interferente?' in df_abordagem_raw.columns:
-            kpi_interferencias += (df_abordagem_raw['Interferente?'] == 'Sim').sum()
+        col_j_painel = aba_painel.col_values(10)
+        col_q_abordagem = aba_abordagem.col_values(17)
+        kpi_nao_licenciadas = col_j_painel.count('Não') + col_q_abordagem.count('Não')
 
-        # Fiscais em atividade (lendo do df_painel_kpi)
+        col_o_painel = aba_painel.col_values(15)
+        col_v_abordagem = aba_abordagem.col_values(22)
+        kpi_interferencias = col_o_painel.count('Sim') + col_v_abordagem.count('Sim')
+
+        fiscais_datas_str = aba_painel.get('W1:AL1')[0]
+        fiscais_valores = aba_painel.get('W2:AL2')[0]
         hoje_brasil = datetime.now(pytz.timezone('America/Sao_Paulo'))
         titulo_data = "Fora do período"
         fiscais_hoje = "0"
-        if not df_painel_kpi.empty:
-            try:
-                # Pega as linhas de data (W1:AL1) e valores (W2:AL2)
-                fiscais_datas_str = df_painel_kpi.columns[22:38] # Colunas W a AL
-                fiscais_valores = df_painel_kpi.iloc[0, 22:38]    # Linha 2 (índice 0 no df)
-                
-                for i, data_str in enumerate(fiscais_datas_str):
-                    if str(data_str).strip() == hoje_brasil.strftime('%d/%m/%Y'):
-                        fiscais_hoje = fiscais_valores[i]
-                        titulo_data = hoje_brasil.strftime('%d/%m')
-                        break
-            except Exception as e:
-                print(f"Erro ao ler dados de fiscais: {e}")
-
-        # BSR/ERB Fake (lendo do df_painel_kpi)
-        bsr_jammers_count, erbs_fake_count = 0, 0
-        if not df_painel_kpi.empty:
-            try:
-                bsr_fake_cells = df_painel_kpi.iloc[0, 20:22] # Linha 2 (índice 0), Colunas U e V
-                bsr_jammers_count = int(bsr_fake_cells[0]) if bsr_fake_cells[0] and bsr_fake_cells[0].isdigit() else 0
-                erbs_fake_count = int(bsr_fake_cells[1]) if len(bsr_fake_cells) > 1 and bsr_fake_cells[1].isdigit() else 0
-            except (IndexError, ValueError, TypeError):
-                bsr_jammers_count, erbs_fake_count = 0, 0
+        if len(fiscais_datas_str) == len(fiscais_valores):
+            for i, data_str in enumerate(fiscais_datas_str):
+                if str(data_str).strip() == hoje_brasil.strftime('%d/%m/%Y'):
+                    fiscais_hoje = fiscais_valores[i]
+                    titulo_data = hoje_brasil.strftime('%d/%m')
+                    break
         
+        bsr_jammers_count, erbs_fake_count = 0, 0
+        try:
+            bsr_fake_cells = aba_painel.get('U2:V2')[0]
+            bsr_jammers_count = int(bsr_fake_cells[0]) if bsr_fake_cells and bsr_fake_cells[0].isdigit() else 0
+            erbs_fake_count = int(bsr_fake_cells[1]) if len(bsr_fake_cells) > 1 and bsr_fake_cells[1].isdigit() else 0
+        except (IndexError, ValueError):
+            bsr_jammers_count, erbs_fake_count = 0, 0
+            
         return (df_return, datetime.now(pytz.timezone('America/Sao_Paulo')), titulo_data, fiscais_hoje,
                 total_pendentes, bsr_jammers_count, erbs_fake_count, 
                 kpi_emissoes_verificadas, kpi_nao_licenciadas, kpi_interferencias)
 
-    except gspread.exceptions.APIError as e:
-        if e.response.status_code == 429:
-            st.error(f"Erro de Quota (429): Muitas solicitações ao Google Sheets. Aguarde 1 minuto e atualize a página.")
-        else:
-            st.error(f"Erro de API ao carregar os dados: {e}")
-        return pd.DataFrame(), None, "Erro", "0", 0, 0, 0, 0, 0, 0
     except Exception as e:
-        st.error(f"Erro inesperado ao carregar os dados: {e}")
+        st.error(f"Erro ao carregar os dados: {e}")
         return pd.DataFrame(), None, "Erro", "0", 0, 0, 0, 0, 0, 0
 estacoes_info = pd.DataFrame({
     'Estação': ['RFeye002129', 'RFeye002175', 'RFeye002315', 'RFeye002012', 'RFeye002303', 'RFeye002093'],
@@ -441,6 +369,10 @@ with st.sidebar:
     st.title("Filtros")
     
     # MODIFICAÇÃO: Adicionado 'Abordagem' à lista de filtros de estação
+    rfeye_stations = estacoes_info['Estação'].unique().tolist()
+    miaer_station = miaer_info['Estação'].unique().tolist()
+    cellpl_station = cellpl_info['Estação'].unique().tolist()
+    estacoes_lista = sorted(rfeye_stations + miaer_station + cellpl_station) + ['Abordagem']
     estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e not in ['Miaer', 'CWSM211022']]) + ['Abordagem']
 
     if not df_original.empty:
@@ -785,6 +717,7 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
 
