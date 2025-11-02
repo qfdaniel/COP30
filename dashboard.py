@@ -223,13 +223,69 @@ def carregar_dados():
         client = gspread.authorize(creds)
         planilha = client.open("MONITORAÇÃO - COP30")
 
-        # --- DADOS DO PAINEL ---
-        aba_painel = planilha.worksheet("PAINEL")
-        dados_painel = aba_painel.get('A1:AL')
-        headers = dados_painel.pop(0)
-        df_painel = pd.DataFrame(dados_painel, columns=headers)
+        # --- DADOS DAS ESTAÇÕES (PAINEL E OUTRAS) ---
+        # MODIFICAÇÃO: Lista de todas as abas de estação para agregar
+        nomes_abas_estacoes = [
+            "PAINEL",
+            "RFeye002093 - ANATEL",
+            "RFeye002303 - PARQUE DA CIDADE",
+            "RFeye002315 - DOCAS",
+            "RFeye002012 - OUTEIRO",
+            "RFeye002175 - ALDEIA",
+            "RFeye002129 - MANGUEIRINHO",
+            "CWSM - UFPA",                 # <-- NOVA ABA
+            "Miaer - PARQUE DA CIDADE"     # <-- NOVA ABA
+        ]
+
+        lista_dfs_estacoes = []
+        headers = None # Inicializa os headers
+
+        # MODIFICAÇÃO: Loop para ler todas as abas da lista
+        for nome_aba in nomes_abas_estacoes:
+            try:
+                aba_estacao = planilha.worksheet(nome_aba)
+                # Assume que todas as abas de estação têm dados em A1:AL
+                dados_estacao = aba_estacao.get('A1:AL') 
+                
+                if not dados_estacao: # Pula aba vazia
+                    continue 
+                
+                if headers is None: # Pega o header da primeira aba não-vazia
+                    headers = dados_estacao.pop(0)
+                else:
+                    if dados_estacao: # Se houver dados
+                        dados_estacao.pop(0) # Descarta o header das abas seguintes
+                    else:
+                        continue # Pula se só tiver o header
+
+                if dados_estacao: # Se houver dados após o header
+                    df_temp = pd.DataFrame(dados_estacao, columns=headers)
+                    lista_dfs_estacoes.append(df_temp)
+            
+            except gspread.exceptions.WorksheetNotFound:
+                # Avisa no console do Streamlit se uma aba não for encontrada, mas não para o script
+                print(f"Aviso: Aba '{nome_aba}' não foi encontrada na planilha. Pulando...")
+            except Exception as e:
+                print(f"Aviso: Erro ao ler a aba '{nome_aba}': {e}. Pulando...")
         
+        # Consolida todos os dataframes das estações
+        if lista_dfs_estacoes:
+            df_estacoes_consolidadas = pd.concat(lista_dfs_estacoes, ignore_index=True)
+        else:
+            # Se todas as abas de estação falharem, tenta pegar o header da "PAINEL" como fallback
+            if headers is None: 
+                try:
+                    aba_painel_fallback = planilha.worksheet("PAINEL")
+                    dados_painel_fallback = aba_painel_fallback.get('A1:AL')
+                    headers = dados_painel_fallback.pop(0)
+                except Exception as e:
+                    st.error(f"Erro crítico: Não foi possível carregar headers da aba 'PAINEL': {e}")
+                    return pd.DataFrame(), None, "Erro", "0", 0, 0, 0, 0, 0, 0
+            df_estacoes_consolidadas = pd.DataFrame(columns=headers)
+
+
         # --- DADOS DA ABORDAGEM ---
+        # (Esta parte permanece idêntica à original)
         aba_abordagem = planilha.worksheet("Abordagem")
         dados_abordagem = aba_abordagem.get('I1:W')
         df_abordagem_final = pd.DataFrame()
@@ -242,7 +298,8 @@ def carregar_dados():
             df_abordagem_raw.dropna(how='all', inplace=True)
 
             if not df_abordagem_raw.empty:
-                df_aligned = pd.DataFrame(columns=headers)
+                # Usa os headers das estações para alinhar colunas
+                df_aligned = pd.DataFrame(columns=headers) 
 
                 # Mapeamento explícito de Abordagem (I:W) para Painel (A:AL)
                 map_letter_to_idx = {chr(ord('I') + i): i for i in range(len(headers_abordagem))}
@@ -276,12 +333,17 @@ def carregar_dados():
                 df_abordagem_final = df_aligned
 
         # --- COMBINA OS DATAFRAMES ---
-        df_return = pd.concat([df_painel, df_abordagem_final], ignore_index=True)
+        # MODIFICAÇÃO: Concatena as ESTAÇÕES CONSOLIDADAS + ABORDAGEM
+        df_return = pd.concat([df_estacoes_consolidadas, df_abordagem_final], ignore_index=True)
 
         # --- LIMPEZA E PROCESSAMENTO DOS DADOS COMBINADOS ---
+        # (O restante da função permanece idêntico)
         total_pendentes = 0
         if not df_return.empty:
             df_return.replace('', pd.NA, inplace=True)
+            # Modificado para não dropar linhas se 'Faixa de Frequência Envolvida' estiver vazia
+            # mas outros dados de abordagem existirem.
+            # Vamos manter o dropna original, pois parece ser a intenção de limpar dados inválidos.
             df_return.dropna(subset=['Faixa de Frequência Envolvida'], how='all', inplace=True)
             df_return['Data'] = pd.to_datetime(df_return['Data'], errors='coerce', dayfirst=True)
             if 'Detalhes da Ocorrência' in df_return.columns:
@@ -290,6 +352,14 @@ def carregar_dados():
                 total_pendentes = (df_return['Situação'] == 'Pendente').sum()
 
         # --- CÁLCULOS DE KPIs ---
+        # (Esta parte permanece idêntica à original)
+        # Nota: Os cálculos de KPI já parecem ler de 'PAINEL' e 'Abordagem' separadamente.
+        # Isso pode precisar de ajuste se os KPIs deveriam ser calculados sobre *todos* os dados.
+        # Por enquanto, vou manter como está no seu código original.
+        
+        # Lê da aba "PAINEL" para KPIs específicos
+        aba_painel = planilha.worksheet("PAINEL") 
+        
         col_f_painel = aba_painel.col_values(6)
         col_m_abordagem = aba_abordagem.col_values(13)
         kpi_emissoes_verificadas = sum(1 for c in col_f_painel[1:] if c) + sum(1 for c in col_m_abordagem[1:] if c)
@@ -329,7 +399,6 @@ def carregar_dados():
     except Exception as e:
         st.error(f"Erro ao carregar os dados: {e}")
         return pd.DataFrame(), None, "Erro", "0", 0, 0, 0, 0, 0, 0
-
 estacoes_info = pd.DataFrame({
     'Estação': ['RFeye002129', 'RFeye002175', 'RFeye002315', 'RFeye002012', 'RFeye002303', 'RFeye002093'],
     'Nome': ['MANGUEIRINHO', 'ALDEIA', 'DOCAS', 'OUTEIRO', 'PARQUE da CIDADE', 'ANATEL'],
@@ -714,5 +783,6 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
