@@ -341,7 +341,8 @@ cellpl_info = pd.DataFrame({'Estação': ['CWSM211022'], 'Nome': ['UFPA'], 'lat'
 
 # Bloco Novo (Substituição)
 # Combina todos os metadados das estações em um único DataFrame
-all_estacoes_info = pd.concat([estacoes_info, miaer_info, cellpl_info], ignore_index=True)
+# Linha Nova (Substituição)
+# A variável 'all_estacoes_info' já foi criada no início do script.
 
 # Aplica a formatação em todos de uma vez
 all_estacoes_info['NomeFormatado'] = all_estacoes_info['Nome'].str.title()
@@ -718,6 +719,7 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
 
