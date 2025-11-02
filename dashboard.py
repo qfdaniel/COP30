@@ -339,9 +339,13 @@ estacoes_info = pd.DataFrame({
 miaer_info = pd.DataFrame({'Estação': ['Miaer'], 'Nome': ['CENSIPAM'], 'lat': [-1.409319], 'lon': [-48.462516], 'size': 25})
 cellpl_info = pd.DataFrame({'Estação': ['CWSM211022'], 'Nome': ['UFPA'], 'lat': [-1.476756], 'lon': [-48.456606], 'size': 25})
 
-for df_info in [estacoes_info, miaer_info, cellpl_info]:
-    df_info['NomeFormatado'] = df_info['Nome'].str.title()
-    df_info['rotulo'] = df_info['Estação'] + ' - ' + df_info['NomeFormatado']
+# Bloco Novo (Substituição)
+# Combina todos os metadados das estações em um único DataFrame
+all_estacoes_info = pd.concat([estacoes_info, miaer_info, cellpl_info], ignore_index=True)
+
+# Aplica a formatação em todos de uma vez
+all_estacoes_info['NomeFormatado'] = all_estacoes_info['Nome'].str.title()
+all_estacoes_info['rotulo'] = all_estacoes_info['Estação'] + ' - ' + all_estacoes_info['NomeFormatado']
 
 (df_original, ultima_atualizacao, titulo_data, fiscais_hoje, 
  total_pendentes_original, bsr_jammers_count, erbs_fake_count, 
@@ -369,11 +373,8 @@ with st.sidebar:
     st.title("Filtros")
     
     # MODIFICAÇÃO: Adicionado 'Abordagem' à lista de filtros de estação
-    rfeye_stations = estacoes_info['Estação'].unique().tolist()
-    miaer_station = miaer_info['Estação'].unique().tolist()
-    cellpl_station = cellpl_info['Estação'].unique().tolist()
-    estacoes_lista = sorted(rfeye_stations + miaer_station + cellpl_station) + ['Abordagem']
-    estacoes_lista = sorted([e for e in estacoes_info['Estação'].unique() if e not in ['Miaer', 'CWSM211022']]) + ['Abordagem']
+    # Bloco Novo (Substituição)
+    estacoes_lista = sorted(all_estacoes_info['Estação'].unique().tolist()) + ['Abordagem']
 
     if not df_original.empty:
         df_filtros = df_original[df_original['Data'].notna()].copy()
@@ -597,7 +598,7 @@ for i, data in enumerate(kpi_data):
 st.markdown('<div style="margin-top: 2.5rem;"></div>', unsafe_allow_html=True)
 
 if not df.empty:
-    df_com_nomes = pd.merge(df, estacoes_info[['Estação', 'Nome']], on='Estação', how='left')
+    df_com_nomes = pd.merge(df, all_estacoes_info[['Estação', 'Nome']], on='Estação', how='left')
     if 'Nome' in df_com_nomes.columns:
         df_com_nomes['Nome'].fillna('Abordagem', inplace=True)
     
@@ -705,7 +706,7 @@ if not df.empty:
             df_tabela.sort_values(by='Data', ascending=False, inplace=True)
             df_tabela['Data'] = df_tabela['Data'].dt.strftime('%d/%m/%Y')
         if 'Região' in df_tabela.columns:
-            df_tabela['Região'] = pd.merge(df, estacoes_info[['Estação', 'Nome']], on='Estação', how='left')['Nome'].fillna('Abordagem').str.title()
+            df_tabela['Região'] = pd.merge(df, all_estacoes_info[['Estação', 'Nome']], on='Estação', how='left')['Nome'].fillna('Abordagem').str.title()
 
         df_para_exportar = df_tabela.copy()
         df_xlsx = to_excel(df_para_exportar)
@@ -717,6 +718,7 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
 
