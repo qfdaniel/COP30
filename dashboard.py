@@ -517,7 +517,7 @@ if not st.session_state.confirm_export:
             st.rerun()
 if st.session_state.confirm_export:
     with placeholder_sidebar.container():
-        st.warning("Confirma a seleção da(s) estação(ões) RFeye?")
+        st.warning("Confirma a seleção da(s) estação(ões) desejada(s)?")
         confirm_col1, confirm_col2 = st.columns(2)
         with confirm_col1:
             st.markdown('<div class="confirm-yes-button">', unsafe_allow_html=True)
@@ -745,6 +745,7 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
 
