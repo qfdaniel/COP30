@@ -527,13 +527,23 @@ if st.session_state.confirm_export:
                     df_export['Processo SEI UTE'] = df_export['Processo SEI UTE'].fillna('').astype(str).str.strip()
                     df_export['Identificação'] = df_export['Identificação'].fillna('').astype(str).str.strip()
                     df_export['Descricao_formatada'] = df_export.apply(
-                        lambda row: f"{row['Identificação']} - Processo SEI UTE {row['Processo SEI UTE']}" if row['Processo SEI UTE'] != '' else row['Identificação'],
+                        lambda row: f"{row['Identificação']} - Processo SEI UTE {row['ProcessO SEI UTE']}" if row['Processo SEI UTE'] != '' else row['Identificação'],
                         axis=1
                     )
-                    df_export['Frequência (MHz)'] = pd.to_numeric(df_export['Frequência (MHz)'], errors='coerce')
-                    df_export['Frequencia_formatada'] = df_export['Frequência (MHz)'].apply(
+                    
+                    # --- CORREÇÃO APLICADA AQUI ---
+                    # 1. Garante que a coluna de frequência seja string e substitui vírgula por ponto.
+                    freq_series_cleaned = df_export['Frequência (MHz)'].astype(str).str.replace(',', '.', regex=False)
+                    
+                    # 2. Converte a string limpa para numérico.
+                    df_export['Frequencia_numerica'] = pd.to_numeric(freq_series_cleaned, errors='coerce')
+                    
+                    # 3. Formata a coluna numérica correta para o padrão do AppAnálise (com 6 casas e vírgula).
+                    df_export['Frequencia_formatada'] = df_export['Frequencia_numerica'].apply(
                         lambda x: f'{x:.6f}'.replace('.', ',') if pd.notna(x) else ''
                     )
+                    # --- FIM DA CORREÇÃO ---
+
                     df_appanalise = pd.DataFrame({
                         'Frequência': df_export['Frequencia_formatada'],
                         'Largura de banda (kHz)': df_export['Largura (kHz)'],
@@ -735,6 +745,7 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
 
