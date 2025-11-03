@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as std
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
@@ -536,7 +536,7 @@ if st.session_state.confirm_export:
                     )
                     df_appanalise = pd.DataFrame({
                         'Frequencia': df_export['Frequencia_formatada'],
-                        'Largura': df_export['Largura (kHz)'],
+                        'Largura': df_export['Largura de banda (kHz)'],
                         'Descricao': df_export['Descricao_formatada']
                     })
                     st.session_state.appanalise_bytes = to_excel(df_appanalise)
@@ -735,3 +735,4 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
