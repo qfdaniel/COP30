@@ -535,9 +535,9 @@ if st.session_state.confirm_export:
                         lambda x: f'{x:.6f}'.replace('.', ',') if pd.notna(x) else ''
                     )
                     df_appanalise = pd.DataFrame({
-                        'Frequencia': df_export['Frequencia_formatada'],
-                        'Largura': df_export['Largura de banda (kHz)'],
-                        'Descricao': df_export['Descricao_formatada']
+                        'Frequência': df_export['Frequencia_formatada'],
+                        'Largura de banda (kHz)': df_export['Largura (kHz)'],
+                        'Descrição': df_export['Descricao_formatada']
                     })
                     st.session_state.appanalise_bytes = to_excel(df_appanalise)
                 st.session_state.confirm_export = False
@@ -735,4 +735,5 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
