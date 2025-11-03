@@ -215,8 +215,6 @@ def to_excel(df: pd.DataFrame):
     return output.getvalue()
 
 # --- FUNÇÃO DE CARREGAMENTO DE DADOS (VERSÃO ORIGINAL CORRETA) ---
-# Esta é a função original do seu script, que é a correta,
-# pois ela depende da sua fórmula QUERY na aba "PAINEL".
 @st.cache_data(ttl=30, show_spinner="Buscando novos dados da planilha...")
 def carregar_dados():
     try:
@@ -340,13 +338,19 @@ estacoes_info = pd.DataFrame({
     'size': 25
 })
 miaer_info = pd.DataFrame({'Estação': ['Miaer'], 'Nome': ['CENSIPAM'], 'lat': [-1.409319], 'lon': [-48.462516], 'size': 25})
-cellpl_info = pd.DataFrame({'Estação': ['CWSM - UFPA'], 'Nome': ['CWSM'], 'lat': [-1.476756], 'lon': [-48.456606], 'size': 25})
 
-# --- CORREÇÃO 1: UNIFICAR METADADOS ---
-# Substituímos o loop 'for' anterior por este bloco, que cria um
-# DataFrame unificado 'all_estacoes_info' para usar em todo o script.
+# --- ALTERAÇÃO 1: DEFINIÇÃO CWSM ---
+# 'Estação' (ID) é 'CWSM' -> Usado no filtro, match de dados, e gráfico por dia.
+# 'Nome' (Display) é 'UFPA' -> Usado no gráfico por região e tabela.
+cellpl_info = pd.DataFrame({'Estação': ['CWSM'], 'Nome': ['UFPA'], 'lat': [-1.476756], 'lon': [-48.456606], 'size': 25})
+
+# --- UNIFICAÇÃO DOS METADADOS ---
 all_estacoes_info = pd.concat([estacoes_info, miaer_info, cellpl_info], ignore_index=True)
-all_estacoes_info['NomeFormatado'] = all_estacoes_info['Nome'].str.title()
+
+# --- ALTERAÇÃO 2: FORMATAÇÃO DO RÓTULO ---
+# Removemos .str.title() para manter "UFPA" em maiúsculo.
+all_estacoes_info['NomeFormatado'] = all_estacoes_info['Nome'] 
+# O rótulo para CWSM será 'CWSM' + ' - ' + 'UFPA' = 'CWSM - UFPA' (para o mapa)
 all_estacoes_info['rotulo'] = all_estacoes_info['Estação'] + ' - ' + all_estacoes_info['NomeFormatado']
 
 
@@ -375,8 +379,7 @@ with st.sidebar:
     st.toggle('Modo Dark', key='theme_toggle', value=(st.session_state.theme == 'Dark'), on_change=toggle_theme)
     st.title("Filtros")
     
-    # --- CORREÇÃO 2: LISTA DE FILTROS ---
-    # A lista de filtros agora usa o DataFrame unificado 'all_estacoes_info'
+    # Lista de filtros usa o 'Estação' (ID), então 'CWSM' aparecerá aqui.
     estacoes_lista = sorted(all_estacoes_info['Estação'].unique().tolist()) + ['Abordagem']
 
     if not df_original.empty:
@@ -482,12 +485,11 @@ if not df.empty:
         datas_para_filtrar = [pd.to_datetime(d.replace('date_', ''), errors='coerce').date() for d in datas_selecionadas_list]
         df = df[df['Data'].dt.date.isin(datas_para_filtrar) | df['Data'].isna()]
 
-    # MODIFICAÇÃO: Lógica de filtro de estação simplificada e corrigida
+    # Filtro de estação usa 'estacoes_lista', que contém 'CWSM'
     estacoes_selecionadas = [s for s in estacoes_lista if st.session_state.get(f'station_{s}', False)]
     if any(st.session_state.get(f'station_{s}', False) for s in estacoes_lista):
         df = df[df['Estação'].isin(estacoes_selecionadas)]
     else:
-        # Se nenhuma estação for selecionada, o dataframe fica vazio
         df = pd.DataFrame(columns=df.columns)
 
     if st.session_state.get('faixa_selecionada', 'Todas') != 'Todas': 
@@ -601,8 +603,8 @@ for i, data in enumerate(kpi_data):
 st.markdown('<div style="margin-top: 2.5rem;"></div>', unsafe_allow_html=True)
 
 if not df.empty:
-    # --- CORREÇÃO 3: GRÁFICO "EMISSÕES POR REGIÃO" ---
-    # Trocamos 'estacoes_info' por 'all_estacoes_info' para buscar os Nomes.
+    # --- GRÁFICO "EMISSÕES POR REGIÃO" ---
+    # 1. Faz o merge com 'all_estacoes_info'
     df_com_nomes = pd.merge(df, all_estacoes_info[['Estação', 'Nome']], on='Estação', how='left')
     
     if 'Nome' in df_com_nomes.columns:
@@ -613,6 +615,7 @@ if not df.empty:
         with st.container():
             st.markdown('<div class="style-marker"></div>', unsafe_allow_html=True)
             st.subheader("Emissões por Região")
+            # 2. Agrupa pelo 'Nome' (Display). 'CWSM' será agrupado como 'UFPA'.
             data_estacao = df_com_nomes['Nome'].value_counts().reset_index()
             data_estacao.columns = ['Nome', 'count']
             data_estacao['label'] = data_estacao['Nome'] + ' (' + data_estacao['count'].astype(str) + ')'
@@ -652,10 +655,8 @@ if not df.empty:
             st.markdown('<div class="style-marker"></div>', unsafe_allow_html=True)
             st.subheader("Mapa das Estações")
             
-            # --- CORREÇÃO 4: MAPA ---
-            # A linha que recriava 'all_estacoes_info' foi removida,
-            # pois a variável já existe.
-            
+            # O mapa usa 'all_estacoes_info' e o campo 'rotulo'.
+            # O rótulo da CWSM será 'CWSM - UFPA'.
             center_lat, center_lon = all_estacoes_info['lat'].mean(), all_estacoes_info['lon'].mean()
             estacoes_filtradas_mapa = [s for s in estacoes_lista if st.session_state.get(f'station_{s}') and s != 'Abordagem']
             default_color, selected_color = "#1A311F", "#14337b"
@@ -677,7 +678,9 @@ if not df.empty:
             df_chart = df.dropna(subset=['Data']).copy()
             if not df_chart.empty:
                 df_chart['Data'] = df_chart['Data'].dt.date
+                # 1. Agrupa pelo 'Estação' (ID).
                 emissoes_por_estacao_dia = df_chart.groupby(['Data', 'Estação']).size().reset_index(name='Nº de Emissões')
+                # 2. Colore pelo 'Estação' (ID). 'CWSM' aparecerá na legenda.
                 fig_estacao_dia = px.bar(emissoes_por_estacao_dia, x='Data', y='Nº de Emissões', color='Estação', template="plotly_white", color_discrete_sequence=COP30_PALETTE, text='Nº de Emissões')
                 fig_estacao_dia.update_traces(textposition='inside', textfont_size=12)
                 fig_estacao_dia.update_xaxes(tickformat="%d/%m", title_text='')
@@ -716,11 +719,11 @@ if not df.empty:
             df_tabela.sort_values(by='Data', ascending=False, inplace=True)
             df_tabela['Data'] = df_tabela['Data'].dt.strftime('%d/%m/%Y')
         
-        # --- CORREÇÃO 5: TABELA ---
-        # Trocamos 'estacoes_info' por 'all_estacoes_info' para buscar os Nomes
-        # para a coluna 'Região' da tabela.
+        # --- ALTERAÇÃO 3: TABELA ---
+        # A coluna 'Região' da tabela usa o 'Nome' (Display), que será 'UFPA'.
+        # Removemos .str.title() para manter 'UFPA' em maiúsculo.
         if 'Região' in df_tabela.columns:
-            df_tabela['Região'] = pd.merge(df, all_estacoes_info[['Estação', 'Nome']], on='Estação', how='left')['Nome'].fillna('Abordagem').str.title()
+            df_tabela['Região'] = pd.merge(df, all_estacoes_info[['Estação', 'Nome']], on='Estação', how='left')['Nome'].fillna('Abordagem')
 
         df_para_exportar = df_tabela.copy()
         df_xlsx = to_excel(df_para_exportar)
@@ -732,5 +735,3 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
-
-
