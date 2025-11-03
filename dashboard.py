@@ -340,7 +340,7 @@ estacoes_info = pd.DataFrame({
     'size': 25
 })
 miaer_info = pd.DataFrame({'Estação': ['Miaer'], 'Nome': ['CENSIPAM'], 'lat': [-1.409319], 'lon': [-48.462516], 'size': 25})
-cellpl_info = pd.DataFrame({'Estação': ['CWSM211022'], 'Nome': ['UFPA'], 'lat': [-1.476756], 'lon': [-48.456606], 'size': 25})
+cellpl_info = pd.DataFrame({'Estação': ['CWSM'], 'Nome': ['CWSM'], 'lat': [-1.476756], 'lon': [-48.456606], 'size': 25})
 
 # --- CORREÇÃO 1: UNIFICAR METADADOS ---
 # Substituímos o loop 'for' anterior por este bloco, que cria um
@@ -732,3 +732,4 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
