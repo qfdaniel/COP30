@@ -698,7 +698,7 @@ if not df.empty:
                 fig_estacao_dia = px.bar(emissoes_por_estacao_dia, x='Data', y='Nº de Emissões', color='Estação', template="plotly_white", color_discrete_sequence=COP30_PALETTE, text='Nº de Emissões')
                 fig_estacao_dia.update_traces(textposition='inside', textfont_size=12)
                 fig_estacao_dia.update_xaxes(tickformat="%d/%m", title_text='')
-                fig_estacao_dia.update_yaxes(title_text='', dtick=1)
+                fig_estacao_dia.update_yaxes(title_text='', dtick=5)
                 fig_estacao_dia.update_layout(legend_title='', margin={"r":19, "t":10, "l":0, "b":10}, paper_bgcolor='rgba(141, 135, 121, 0.2)', plot_bgcolor='rgba(0,0,0,0)', height=424, legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
                 st.plotly_chart(fig_estacao_dia, use_container_width=True)
             else: st.info("Nenhuma emissão com data válida na seleção.")
@@ -749,6 +749,7 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
 
