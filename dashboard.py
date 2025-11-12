@@ -290,10 +290,9 @@ def carregar_dados():
                 total_pendentes = (df_return['Situação'] == 'Pendente').sum()
 
         # --- CÁLCULOS DE KPIs ---
-        aba_ute = planilha.worksheet("Tabela UTE")
-        dados_ute = aba_ute.get_all_values()
-        # Subtrai 1 para desconsiderar o cabeçalho
-        kpi_solicitacoes_ute = len(dados_ute) - 1
+        col_f_painel = aba_painel.col_values(6)
+        col_m_abordagem = aba_abordagem.col_values(13)
+        kpi_emissoes_verificadas = sum(1 for c in col_f_painel[1:] if c) + sum(1 for c in col_m_abordagem[1:] if c)
 
         col_j_painel = aba_painel.col_values(10)
         col_q_abordagem = aba_abordagem.col_values(17)
@@ -325,7 +324,7 @@ def carregar_dados():
             
         return (df_return, datetime.now(pytz.timezone('America/Sao_Paulo')), titulo_data, fiscais_hoje,
                 total_pendentes, bsr_jammers_count, erbs_fake_count, 
-                kpi_emissoes_verificadas, kpi_nao_licenciadas, kpi_solicitacoes_ute)
+                kpi_emissoes_verificadas, kpi_nao_licenciadas, kpi_interferencias)
 
     except Exception as e:
         st.error(f"Erro ao carregar os dados: {e}")
@@ -357,7 +356,7 @@ all_estacoes_info['rotulo'] = all_estacoes_info['Estação'] + ' - ' + all_estac
 
 (df_original, ultima_atualizacao, titulo_data, fiscais_hoje, 
  total_pendentes_original, bsr_jammers_count, erbs_fake_count, 
- kpi_emissoes_verificadas, kpi_nao_licenciadas, kpi_solicitacoes_ute) = carregar_dados()
+ kpi_emissoes_verificadas, kpi_nao_licenciadas, kpi_interferencias) = carregar_dados()
 
 if df_original is None: st.warning("Não foi possível carregar os dados da planilha."); st.stop()
 if 'reset_key' not in st.session_state: st.session_state.reset_key = 0
@@ -597,24 +596,14 @@ elif df_original.empty:
     
 kpi_cols = st.columns(6, gap="small")
 kpi_data = [
-    # 1. Emissões verificadas (Cor Verde Original)
     {"label": "Emissões verificadas", "value": kpi_emissoes_verificadas, "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Total de emissões verificadas, conforme os filtros aplicados (padrão: 'todas')."},
-    
-    # 2. Solicitações UTE (Novo KPI, Cor Azul)
-    {"label": "Solicitações UTE", "value": kpi_solicitacoes_ute, "color": "linear-gradient(to bottom, #14337b, #4464A7)", "tooltip": "Total de frequências solicitadas para Uso Temporário do Espectro no evento"},
-    
-    # 3. Verificações Pendentes (Cor Vermelha Original)
+    {"label": "Não Licenciadas", "value": kpi_nao_licenciadas, "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Total de emissões 'Não' licenciadas (Total de emissões não licenciadas considerando os filtros aplicados)."},
     {"label": "Verificações Pendentes", "value": total_pendentes_original, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Total de emissões aguardando alguma identificação/verificação (não afetado por filtros)."},
-    
-    # 4. Não Licenciadas (Cor Vermelha - igual ao BSR)
-    {"label": "Não Licenciadas", "value": kpi_nao_licenciadas, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Total de emissões 'Não' licenciadas (Total de emissões não licenciadas considerando os filtros aplicados)."},
-    
-    # 5. BSRs (Jammers) (Cor Vermelha Original)
+    {"label": "Interferências", "value": kpi_interferencias, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Total de interferências registradas no evento (não afetado por filtros)."},
     {"label": "BSRs (Jammers)", "value": int(bsr_jammers_count), "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Contagem total de BSRs/Jammers identificados."},
-    
-    # 6. ERBs Fake (Cor Vermelha Original)
     {"label": "ERBs Fake", "value": int(erbs_fake_count), "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Contagem total de ERBs Fake identificadas."}
 ]
+
 for i, data in enumerate(kpi_data):
     with kpi_cols[i]:
         st.markdown(f"""
@@ -760,7 +749,6 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
-
 
 
 
