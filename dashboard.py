@@ -608,7 +608,7 @@ kpi_data = [
     {"label": "Emissões verificadas", "value": kpi_emissoes_verificadas, "color": "linear-gradient(135deg, #4CAF50 0%, #9CCC65 100%)", "tooltip": "Total de emissões verificadas, conforme os filtros aplicados (padrão: 'todas')."},
     
     # 2. Solicitações UTE (Novo KPI, Cor Azul)
-    {"label": "Solicitações UTE", "value": kpi_solicitacoes_ute, "color": "linear-gradient(to bottom, #14337b, #4464A7)", "tooltip": "Total de frequências solicitadas para Uso Temporário do Espectro no evento"},
+    {"label": "Solicitações UTE", "value": kpi_solicitacoes_ute, "color": "linear-gradient(to bottom, #1a3f8a, #527ac9)", "tooltip": "Total de frequências solicitadas para Uso Temporário do Espectro no evento"},
     
     # 3. Verificações Pendentes (Cor Vermelha Original)
     {"label": "Verificações Pendentes", "value": total_pendentes_original, "color": f"linear-gradient(135deg, {BASE_PALETTE[4]} 0%, {VARIANT_PALETTE[4]} 100%)", "tooltip": "Total de emissões aguardando alguma identificação/verificação (não afetado por filtros)."},
@@ -767,6 +767,7 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
 
