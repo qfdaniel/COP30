@@ -547,19 +547,36 @@ if st.session_state.confirm_export:
                     # 1. Garante que a coluna de frequência seja string e substitui vírgula por ponto.
                     freq_series_cleaned = df_export['Frequência (MHz)'].astype(str).str.replace(',', '.', regex=False)
                     
-                    # 2. Converte a string limpa para numérico.
-                    df_export['Frequencia_numerica'] = pd.to_numeric(freq_series_cleaned, errors='coerce')
-                    df_export = df_export.sort_values(by='Frequencia_numerica', ascending=True)
+                        # 2. Converte a string limpa para numérico.
+                        df_export['Frequencia_numerica'] = pd.to_numeric(freq_series_cleaned, errors='coerce')
+                        df_export = df_export.sort_values(by='Frequencia_numerica', ascending=True)
+                    # --- FIM DA LINHA ADICIONADA ---
+
                     # 3. Formata a coluna numérica correta para o padrão do AppAnálise (com 6 casas e vírgula).
                     df_export['Frequencia_formatada'] = df_export['Frequencia_numerica'].apply(
                         lambda x: f'{x:.6f}'.replace('.', ',') if pd.notna(x) else ''
                     )
                     # --- FIM DA CORREÇÃO DA FREQUÊNCIA ---
 
+                    # --- LÓGICA DE DUPLICIDADE ADICIONADA ---
+                    # 1. Identifica duplicados na frequência numérica (após ordenação)
+                    #    keep='first' marca a primeira ocorrência como False e as seguintes como True
+                    is_duplicate = df_export['Frequencia_numerica'].duplicated(keep='first')
+                    
+                    # 2. Cria a nova coluna de texto mapeando True/False
+                    df_export['Coluna_Duplicada_Texto'] = is_duplicate.map({
+                        True: "freq. duplicada", 
+                        False: ""
+                    })
+                    # --- FIM DA LÓGICA DE DUPLICIDADE ---
+
                     df_appanalise = pd.DataFrame({
                         'Frequência': df_export['Frequencia_formatada'],
                         'Largura de banda (kHz)': df_export['Largura (kHz)'],
-                        'Descrição': df_export['Descricao_formatada']
+                        'Descrição': df_export['Descricao_formatada'],
+                        
+                        # 4. Coluna de duplicidade adicionada ao DataFrame final
+                        'Freq duplicadas - APAGAR coluna': df_export['Coluna_Duplicada_Texto']
                     })
                     st.session_state.appanalise_bytes = to_excel(df_appanalise)
                 st.session_state.confirm_export = False
@@ -767,6 +784,7 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
 
