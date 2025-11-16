@@ -536,48 +536,46 @@ if st.session_state.confirm_export:
                     df_export['Identificação'] = df_export['Identificação'].fillna('').astype(str).str.strip()
                     
                     # --- CORREÇÃO DO TYPO APLICADA AQUI ---
-                    # Corrigido 'ProcessO' para 'Processo'
                     df_export['Descricao_formatada'] = df_export.apply(
                         lambda row: f"{row['Identificação']} - Processo SEI UTE {row['Processo SEI UTE']}" if row['Processo SEI UTE'] != '' else row['Identificação'],
                         axis=1
                     )
                     # --- FIM DA CORREÇÃO DO TYPO ---
 
-                    # --- CORREÇÃO DA FREQUÊNCIA (DA RESPOSTA ANTERIOR) ---
+                    # --- LÓGICA DE FREQUÊNCIA, ORDENAÇÃO E DUPLICIDADE ---
+                    
                     # 1. Garante que a coluna de frequência seja string e substitui vírgula por ponto.
                     freq_series_cleaned = df_export['Frequência (MHz)'].astype(str).str.replace(',', '.', regex=False)
                     
-                        # 2. Converte a string limpa para numérico.
-                        df_export['Frequencia_numerica'] = pd.to_numeric(freq_series_cleaned, errors='coerce')
-                        df_export = df_export.sort_values(by='Frequencia_numerica', ascending=True)
-                    # --- FIM DA LINHA ADICIONADA ---
+                    # 2. Converte a string limpa para numérico.
+                    df_export['Frequencia_numerica'] = pd.to_numeric(freq_series_cleaned, errors='coerce')
+                    
+                    # 3. ORDENA o DataFrame pela frequência numérica
+                    df_export = df_export.sort_values(by='Frequencia_numerica', ascending=True)
 
-                    # 3. Formata a coluna numérica correta para o padrão do AppAnálise (com 6 casas e vírgula).
+                    # 4. Formata a coluna numérica para o padrão do AppAnálise (com 6 casas e vírgula).
                     df_export['Frequencia_formatada'] = df_export['Frequencia_numerica'].apply(
                         lambda x: f'{x:.6f}'.replace('.', ',') if pd.notna(x) else ''
                     )
-                    # --- FIM DA CORREÇÃO DA FREQUÊNCIA ---
-
-                    # --- LÓGICA DE DUPLICIDADE ADICIONADA ---
-                    # 1. Identifica duplicados na frequência numérica (após ordenação)
-                    #    keep='first' marca a primeira ocorrência como False e as seguintes como True
+                    
+                    # 5. Identifica duplicados na frequência numérica (APÓS ordenação)
                     is_duplicate = df_export['Frequencia_numerica'].duplicated(keep='first')
                     
-                    # 2. Cria a nova coluna de texto mapeando True/False
+                    # 6. Cria a nova coluna de texto mapeando True/False
                     df_export['Coluna_Duplicada_Texto'] = is_duplicate.map({
                         True: "freq. duplicada", 
                         False: ""
                     })
-                    # --- FIM DA LÓGICA DE DUPLICIDADE ---
+                    # --- FIM DA LÓGICA ---
 
+                    # 7. Cria o DataFrame final para o Excel
                     df_appanalise = pd.DataFrame({
                         'Frequência': df_export['Frequencia_formatada'],
                         'Largura de banda (kHz)': df_export['Largura (kHz)'],
                         'Descrição': df_export['Descricao_formatada'],
-                        
-                        # 4. Coluna de duplicidade adicionada ao DataFrame final
                         'Freq duplicadas - APAGAR coluna': df_export['Coluna_Duplicada_Texto']
                     })
+                    
                     st.session_state.appanalise_bytes = to_excel(df_appanalise)
                 st.session_state.confirm_export = False
                 st.rerun()
@@ -587,8 +585,7 @@ if st.session_state.confirm_export:
             if st.button("Não", use_container_width=True, key="confirm_no"):
                 st.session_state.confirm_export = False
                 st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-if st.session_state.appanalise_bytes:
+            st.markdown('</div>', unsafe_allow_html=True)if st.session_state.appanalise_bytes:
     with placeholder_sidebar.container():
         st.download_button(
             label="📥 Baixar Arquivo para AppAnálise",
@@ -598,7 +595,6 @@ if st.session_state.appanalise_bytes:
             use_container_width=True
         )
         st.session_state.appanalise_bytes = None
-
 header_cols = st.columns([0.1, 0.8, 0.1])
 with header_cols[0]: st.image("logo.png", width=115)
 with header_cols[1]:
@@ -784,6 +780,7 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
 
