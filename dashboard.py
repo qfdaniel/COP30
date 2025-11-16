@@ -549,7 +549,7 @@ if st.session_state.confirm_export:
                     
                     # 2. Converte a string limpa para numérico.
                     df_export['Frequencia_numerica'] = pd.to_numeric(freq_series_cleaned, errors='coerce')
-                    
+                    df_export = df_export.sort_values(by='Frequencia_numerica', ascending=True)
                     # 3. Formata a coluna numérica correta para o padrão do AppAnálise (com 6 casas e vírgula).
                     df_export['Frequencia_formatada'] = df_export['Frequencia_numerica'].apply(
                         lambda x: f'{x:.6f}'.replace('.', ',') if pd.notna(x) else ''
@@ -767,6 +767,7 @@ if not df.empty:
         gb.configure_default_column(flex=1, cellStyle={'text-align': 'center'}, sortable=True, filter=True, resizable=True)
         gridOptions = gb.build()
         AgGrid(df_tabela, gridOptions=gridOptions, theme='streamlit' if st.session_state.theme == 'Light' else 'alpine-dark', allow_unsafe_jscode=True, height=400, use_container_width=True)
+
 
 
 
